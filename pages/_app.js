@@ -10,6 +10,7 @@ export default function App({ Component, pageProps }) {
       <Head>
         <title>ShadeKits — Bolt-Together Steel Shade Structures</title>
         <meta name="theme-color" content="#DC2626" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </Head>
       <Component {...pageProps} />
     </div>
