@@ -73,7 +73,7 @@ Notes: `);
     <label className="block mb-4">
       <div className="text-sm font-medium text-gray-700 mb-1">{label}</div>
       <select
-        className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-800"
+        className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600"
         value={value}
         onChange={(e) => onChange(isNaN(options[0].id) ? e.target.value : Number(e.target.value))}
       >
@@ -129,7 +129,7 @@ Notes: `);
               <div className="text-sm font-medium text-gray-700 mb-2">Add-Ons</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {ADDONS.map(o => (
-                  <label key={o.id} className={`flex items-center gap-2 rounded-xl border p-2 ${addOns.includes(o.id)?'border-black bg-neutral-50':'border-neutral-300'}`}>
+                  <label key={o.id} className={`flex items-center gap-2 rounded-xl border p-2 ${addOns.includes(o.id)?'border-red-600 bg-neutral-50':'border-neutral-300'}`}>
                     <input type="checkbox" checked={addOns.includes(o.id)} onChange={() => toggleAddOn(o.id)} />
                     <span className="text-sm">{o.label}</span>
                     {o.priceAdj !== 0 && (
@@ -155,7 +155,7 @@ Notes: `);
               </div>
               <div className="flex gap-2">
                 <button onClick={() => window.print()} className="rounded-2xl px-4 py-2 border border-neutral-300 text-sm">Download Summary</button>
-                <button onClick={sendQuote} className="rounded-2xl px-4 py-2 bg-black text-white text-sm">Email Quote</button>
+                <button onClick={sendQuote} className="rounded-2xl px-4 py-2 bg-red-600 text-white hover:bg-red-700 text-sm">Email Quote</button>
               </div>
             </div>
           </div>
