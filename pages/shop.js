@@ -1,7 +1,7 @@
-import Link from 'next/link'
-import Layout from '@/components/Layout'
-import Section from '@/components/Section'
-import { CATALOG } from '@/data/products'
+import Link from 'next/link';
+import Layout from '../components/Layout';
+import Section from '../components/Section';
+import { CATALOG } from '../data/products';
 
 export default function Shop() {
   return (
@@ -22,5 +22,5 @@ export default function Shop() {
         </div>
       </Section>
     </Layout>
-  )
+  );
 }
