@@ -7,11 +7,16 @@ export default function Layout({ children }) {
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold tracking-tight">ShadeKits</Link>
           <nav className="hidden md:flex gap-6 text-sm text-neutral-700">
-            <Link href="/shop" className="hover:text-black">Shop</Link>
-            <Link href="/resources" className="hover:text-black">Install Resources</Link>
-            <Link href="/contact" className="hover:text-black">Contact</Link>
+            <Link href="/shop" className="hover:text-red-600">Shop</Link>
+            <Link href="/resources" className="hover:text-red-600">Install Resources</Link>
+            <Link href="/contact" className="hover:text-red-600">Contact</Link>
           </nav>
-          <Link href="/contact" className="rounded-2xl px-4 py-2 border border-neutral-300 shadow-sm hover:shadow text-sm">Get a Quote</Link>
+          <Link
+            href="/contact"
+            className="rounded-2xl px-4 py-2 bg-red-600 text-white hover:bg-red-700 shadow-sm text-sm"
+          >
+            Get a Quote
+          </Link>
         </div>
       </header>
       <main>{children}</main>
@@ -19,9 +24,9 @@ export default function Layout({ children }) {
         <div className="mx-auto max-w-7xl px-4 py-8 text-sm text-neutral-600 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>© {new Date().getFullYear()} ShadeKits — Fabricated in the USA</div>
           <div className="flex gap-4">
-            <a className="hover:text-black" href="#">Terms</a>
-            <a className="hover:text-black" href="#">Privacy</a>
-            <a className="hover:text-black" href="#">Support</a>
+            <a className="hover:text-red-600" href="#">Terms</a>
+            <a className="hover:text-red-600" href="#">Privacy</a>
+            <a className="hover:text-red-600" href="#">Support</a>
           </div>
         </div>
       </footer>
