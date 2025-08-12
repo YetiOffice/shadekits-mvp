@@ -5,7 +5,6 @@ export default function Contact() {
   const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'office@yetiwelding.com';
   const phone = process.env.NEXT_PUBLIC_CONTACT_PHONE || '+18019958906';
 
-  // Separate handler so we avoid quote issues inside JSX
   const handleSubmit = (e) => {
     e.preventDefault();
     alert('Thanks! We will be in touch.');
@@ -17,9 +16,8 @@ export default function Contact() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="rounded-2xl bg-white border border-neutral-200 p-6 shadow-sm">
             <div className="text-sm text-neutral-700">
-              Send us your project details and we’ll reply fast.
+              Send us your project details and we will reply fast.
             </div>
-
             <form className="mt-4 grid grid-cols-1 gap-3" onSubmit={handleSubmit}>
               <input className="rounded-xl border border-neutral-300 px-3 py-2" placeholder="Name" required />
               <input className="rounded-xl border border-neutral-300 px-3 py-2" placeholder="Email" type="email" required />
