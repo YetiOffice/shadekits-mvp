@@ -12,12 +12,15 @@ a { @apply transition-colors; }
 @layer components {
   .container-7xl { @apply mx-auto max-w-7xl px-4; }
 
-  /* Brand buttons */
+  /* Buttons */
   .btn-primary { @apply inline-flex items-center justify-center rounded-2xl px-4 py-2 bg-red-600 text-white hover:bg-red-700 text-sm shadow-sm; }
   .btn-secondary { @apply inline-flex items-center justify-center rounded-2xl px-4 py-2 border border-neutral-300 bg-white hover:bg-neutral-50 text-sm; }
 
-  /* Inputs, cards, titles */
+  /* Inputs, cards, badges */
   .input { @apply rounded-xl border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600; }
-  .card { @apply rounded-2xl bg-white border border-neutral-200 shadow-sm; }
-  .section-title { @apply text-lg font-semibold mb-4; }
+  .card { @apply rounded-3xl bg-white border border-neutral-200 shadow-sm; }
+  .badge { @apply inline-flex items-center rounded-full bg-red-100 text-red-700 text-xs px-2.5 py-1 font-medium; }
+
+  /* Titles */
+  .section-title { @apply text-xl font-semibold mb-4; }
 }
