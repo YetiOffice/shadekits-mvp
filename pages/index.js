@@ -15,7 +15,7 @@ export default function Home() {
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
               <p className="mt-3 max-w-2xl">Pre-engineered steel kits with DIY-friendly bolt-together assembly. Ships nationwide in 3–4 weeks.</p>
               <div className="mt-6 flex gap-3">
-                <Link href="/shop" className="rounded-2xl px-4 py-2 bg-black text-white text-sm">Shop Kits</Link>
+                <Link href="/shop" className="rounded-2xl px-4 py-2 bg-red-600 text-white hover:bg-red-700 text-sm">Shop Kits</Link>
                 <Link href="/resources" className="rounded-2xl px-4 py-2 border border-neutral-300 text-sm bg-white">How It Works</Link>
               </div>
             </div>
@@ -60,7 +60,7 @@ export default function Home() {
             <div className="text-lg font-bold">Your shade solution is one click away.</div>
             <div className="text-neutral-700">Get a fast quote today — ships in 3–4 weeks.</div>
           </div>
-          <Link href="/contact" className="rounded-2xl px-4 py-2 bg-black text-white text-sm">Get a Free Quote</Link>
+          <Link href="/contact" className="rounded-2xl px-4 py-2 bg-red-600 text-white hover:bg-red-700 text-sm">Get a Free Quote</Link>
         </div>
       </Section>
     </Layout>
