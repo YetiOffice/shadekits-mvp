@@ -5,7 +5,7 @@ export default function Layout({ children }) {
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-neutral-200">
         <div className="container-7xl py-3 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold tracking-tight">ShadeKits</Link>
+          <Link href="/" className="text-[22px] font-extrabold tracking-tight">ShadeKits</Link>
           <nav className="hidden md:flex gap-6 text-sm text-neutral-700">
             <Link href="/shop" className="hover:text-red-600">Shop</Link>
             <Link href="/resources" className="hover:text-red-600">Install Resources</Link>
