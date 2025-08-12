@@ -1,38 +1,38 @@
 import React from 'react';
-import { useRouter } from 'next/router'
-import Layout from '@/components/Layout'
-import Section from '@/components/Section'
-import { CATALOG, ROOF, COLOR, HEIGHT, MOUNT, PANELS, ADDONS } from '@/data/products'
+import { useRouter } from 'next/router';
+import Layout from '../../components/Layout';
+import Section from '../../components/Section';
+import { CATALOG, ROOF, COLOR, HEIGHT, MOUNT, PANELS, ADDONS } from '../../data/products';
 
-const money = (n) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' })
+const money = (n) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 
 export default function Product() {
-  const router = useRouter()
-  const { id } = router.query
-  const product = CATALOG.find(p => p.id === id) || CATALOG[0]
+  const router = useRouter();
+  const { id } = router.query;
+  const product = CATALOG.find(p => p.id === id) || CATALOG[0];
 
-  const [roof, setRoof] = React.useState(ROOF[0].id)
-  const [color, setColor] = React.useState(COLOR[0].id)
-  const [height, setHeight] = React.useState(10)
-  const [mounting, setMounting] = React.useState(MOUNT[0].id)
-  const [panels, setPanels] = React.useState(PANELS[0].id)
-  const [addOns, setAddOns] = React.useState([])
-  const [qty, setQty] = React.useState(1)
+  const [roof, setRoof] = React.useState(ROOF[0].id);
+  const [color, setColor] = React.useState(COLOR[0].id);
+  const [height, setHeight] = React.useState(10);
+  const [mounting, setMounting] = React.useState(MOUNT[0].id);
+  const [panels, setPanels] = React.useState(PANELS[0].id);
+  const [addOns, setAddOns] = React.useState([]);
+  const [qty, setQty] = React.useState(1);
 
-  const getAdj = (opts, id) => (opts.find(o => o.id === id)?.priceAdj || 0)
-  const addOnAdj = addOns.map(id => getAdj(ADDONS, id)).reduce((a,b)=>a+b,0)
+  const getAdj = (opts, id) => (opts.find(o => o.id === id)?.priceAdj || 0);
+  const addOnAdj = addOns.map(id => getAdj(ADDONS, id)).reduce((a,b)=>a+b,0);
   const total = (product.basePrice +
     getAdj(ROOF, roof) +
     getAdj(COLOR, color) +
     getAdj(HEIGHT, height) +
     getAdj(MOUNT, mounting) +
     getAdj(PANELS, panels) +
-    addOnAdj) * qty
+    addOnAdj) * qty;
 
-  const toggleAddOn = (id) => setAddOns(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const toggleAddOn = (id) => setAddOns(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-  const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'office@yetiwelding.com'
-  const contactPhone = process.env.NEXT_PUBLIC_CONTACT_PHONE || '+18019958906'
+  const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'office@yetiwelding.com';
+  const contactPhone = process.env.NEXT_PUBLIC_CONTACT_PHONE || '+18019958906';
 
   const sendQuote = () => {
     const sel = {
@@ -45,8 +45,8 @@ export default function Product() {
       addOns: addOns.map(id => ADDONS.find(o => o.id === id)?.label),
       quantity: qty,
       estTotal: money(total),
-    }
-    const subject = encodeURIComponent(`[Quote Request] ${product.name}`)
+    };
+    const subject = encodeURIComponent(`[Quote Request] ${product.name}`);
     const body = encodeURIComponent(
 `Name: 
 Company: 
@@ -65,9 +65,9 @@ Quantity: ${sel.quantity}
 Estimated Total: ${sel.estTotal}
 
 Ship-to City/State: 
-Notes: `)
-    window.location.href = \`mailto:\${contactEmail}?subject=\${subject}&body=\${body}\`
-  }
+Notes: `);
+    window.location.href = `mailto:${contactEmail}?subject=${subject}&body=${body}`;
+  };
 
   const Select = ({ label, value, onChange, options }) => (
     <label className="block mb-4">
@@ -84,7 +84,7 @@ Notes: `)
         ))}
       </select>
     </label>
-  )
+  );
 
   return (
     <Layout>
@@ -97,12 +97,12 @@ Notes: `)
           <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm border border-neutral-200">
             <h2 className="text-lg font-semibold mb-2">About this kit</h2>
             <p className="text-neutral-700 leading-relaxed">
-              Commercial-grade, bolt‑together steel shade kit engineered for outdoor spaces.
+              Commercial-grade, bolt-together steel shade kit engineered for outdoor spaces.
               Ships with all hardware and illustrated instructions. Lead time: 3–4 weeks.
-              1‑year workmanship + finish warranty. 30‑day returns (unused; buyer pays return freight).
+              1-year workmanship + finish warranty. 30-day returns (unused; buyer pays return freight).
             </p>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[['Footprint', product.footprint], ['Clearance', product.clearance], ['Frame', 'Powder‑coated steel']].map((s, i) => (
+              {[['Footprint', product.footprint], ['Clearance', product.clearance], ['Frame', 'Powder-coated steel']].map((s, i) => (
                 <div key={i} className="rounded-xl bg-neutral-50 border border-neutral-200 p-3">
                   <div className="text-xs uppercase tracking-wide text-neutral-500">{s[0]}</div>
                   <div className="text-sm font-medium">{s[1]}</div>
@@ -126,10 +126,10 @@ Notes: `)
             <Select label="Side Panels" value={panels} onChange={setPanels} options={PANELS} />
 
             <div className="mb-4">
-              <div className="text-sm font-medium text-gray-700 mb-2">Add‑Ons</div>
+              <div className="text-sm font-medium text-gray-700 mb-2">Add-Ons</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {ADDONS.map(o => (
-                  <label key={o.id} className={\`flex items-center gap-2 rounded-xl border p-2 \${addOns.includes(o.id)?'border-black bg-neutral-50':'border-neutral-300'}\`}>
+                  <label key={o.id} className={`flex items-center gap-2 rounded-xl border p-2 ${addOns.includes(o.id)?'border-black bg-neutral-50':'border-neutral-300'}`}>
                     <input type="checkbox" checked={addOns.includes(o.id)} onChange={() => toggleAddOn(o.id)} />
                     <span className="text-sm">{o.label}</span>
                     {o.priceAdj !== 0 && (
@@ -162,5 +162,5 @@ Notes: `)
         </aside>
       </main>
     </Layout>
-  )
+  );
 }
