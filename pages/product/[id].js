@@ -48,8 +48,8 @@ export default function Product() {
     };
     const subject = encodeURIComponent(`[Quote Request] ${product.name}`);
     const body = encodeURIComponent(
-`Name: 
-Company: 
+`Name:
+Company:
 Phone: ${contactPhone}
 Email: ${contactEmail}
 
@@ -64,7 +64,7 @@ Quantity: ${sel.quantity}
 
 Estimated Total: ${sel.estTotal}
 
-Ship-to City/State: 
+Ship-to City/State:
 Notes: `);
     window.location.href = `mailto:${contactEmail}?subject=${subject}&body=${body}`;
   };
@@ -73,7 +73,7 @@ Notes: `);
     <label className="block mb-4">
       <div className="text-sm font-medium text-gray-700 mb-1">{label}</div>
       <select
-        className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600"
+        className="input"
         value={value}
         onChange={(e) => onChange(isNaN(options[0].id) ? e.target.value : Number(e.target.value))}
       >
@@ -88,13 +88,13 @@ Notes: `);
 
   return (
     <Layout>
-      <main className="mx-auto max-w-7xl px-4 py-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <main className="container-7xl py-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
         <section>
-          <div className="aspect-[16/9] w-full rounded-2xl overflow-hidden shadow border border-neutral-200">
-            <div className="w-full h-full bg-neutral-200 flex items-center justify-center">{product.name}</div>
+          <div className="card overflow-hidden">
+            <div className="w-full aspect-[16/9] bg-neutral-200 flex items-center justify-center">{product.name}</div>
           </div>
 
-          <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm border border-neutral-200">
+          <div className="card p-6 mt-8">
             <h2 className="text-lg font-semibold mb-2">About this kit</h2>
             <p className="text-neutral-700 leading-relaxed">
               Commercial-grade, bolt-together steel shade kit engineered for outdoor spaces.
@@ -113,7 +113,7 @@ Notes: `);
         </section>
 
         <aside className="lg:sticky lg:top-16 self-start">
-          <div className="rounded-2xl bg-white p-6 shadow-sm border border-neutral-200">
+          <div className="card p-6">
             <h1 className="text-2xl font-bold">{product.name}</h1>
             <div className="mt-1 text-sm text-neutral-600">Starting at {money(product.basePrice)}</div>
 
@@ -140,23 +140,21 @@ Notes: `);
               </div>
             </div>
 
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-medium text-gray-700">Quantity</div>
-              <input type="number" min={1} value={qty} onChange={(e)=>setQty(Number(e.target.value)||1)} className="w-20 rounded-xl border border-neutral-300 px-3 py-2 text-right"/>
-            </div>
-
-            <div className="h-px bg-neutral-200 my-4" />
-
-            <div className="flex items-end justify-between">
+            <div className="flex items-center justify-between">
               <div>
                 <div className="text-xs uppercase tracking-wide text-neutral-500">Estimated Total</div>
                 <div className="text-3xl font-extrabold">{money(total)}</div>
                 <div className="text-xs text-neutral-500">Taxes & freight calculated at quote.</div>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => window.print()} className="rounded-2xl px-4 py-2 border border-neutral-300 text-sm">Download Summary</button>
-                <button onClick={sendQuote} className="rounded-2xl px-4 py-2 bg-red-600 text-white hover:bg-red-700 text-sm">Email Quote</button>
+                <button onClick={() => window.print()} className="btn-secondary">Download Summary</button>
+                <button onClick={sendQuote} className="btn-primary">Email Quote</button>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm font-medium text-gray-700">Quantity</div>
+              <input type="number" min={1} value={qty} onChange={(e)=>setQty(Number(e.target.value)||1)} className="input w-20 text-right"/>
             </div>
           </div>
         </aside>
