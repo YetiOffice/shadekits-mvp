@@ -1,7 +1,7 @@
-import Link from 'next/link'
-import Layout from '@/components/Layout'
-import Section from '@/components/Section'
-import { CATALOG } from '@/data/products'
+import Link from 'next/link';
+import Layout from '../components/Layout';
+import Section from '../components/Section';
+import { CATALOG } from '../data/products';
 
 export default function Home() {
   return (
@@ -13,7 +13,7 @@ export default function Home() {
               <div className="text-3xl md:text-5xl font-extrabold">Commercial-Grade Shade Structures</div>
             </div>
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-              <p className="mt-3 max-w-2xl">Pre‑engineered steel kits with DIY‑friendly bolt‑together assembly. Ships nationwide in 3–4 weeks.</p>
+              <p className="mt-3 max-w-2xl">Pre-engineered steel kits with DIY-friendly bolt-together assembly. Ships nationwide in 3–4 weeks.</p>
               <div className="mt-6 flex gap-3">
                 <Link href="/shop" className="rounded-2xl px-4 py-2 bg-black text-white text-sm">Shop Kits</Link>
                 <Link href="/resources" className="rounded-2xl px-4 py-2 border border-neutral-300 text-sm bg-white">How It Works</Link>
@@ -41,9 +41,9 @@ export default function Home() {
       <Section title="Why Choose Us" className="py-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           {[
-            ["Commercial‑grade steel","Engineered for weather loads"],
-            ["Bolt‑together design","DIY or contractor‑friendly"],
-            ["Ships nationwide","Freight‑ready packaging"],
+            ["Commercial-grade steel","Engineered for weather loads"],
+            ["Bolt-together design","DIY or contractor-friendly"],
+            ["Ships nationwide","Freight-ready packaging"],
             ["Real support","Install guides & videos"],
           ].map((pair, i) => (
             <div key={i} className="rounded-2xl bg-white border border-neutral-200 p-4 shadow-sm">
@@ -64,5 +64,5 @@ export default function Home() {
         </div>
       </Section>
     </Layout>
-  )
+  );
 }
