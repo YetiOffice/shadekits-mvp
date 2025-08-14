@@ -24,7 +24,7 @@ export default function Layout({ children, title = 'ShadeKits', description = 'C
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm text-neutral-700">
             <Link href="/" className="hover:text-red-600">Shop</Link>
-            <Link href="/configurator" className="hover:text-red-600">Build</Link>
+            <Link href="/builder" className="hover:text-red-600">Build</Link>
             <Link href="/resources" className="hover:text-red-600">Install Resources</Link>
             <Link href="/contact" className="hover:text-red-600">Contact</Link>
           </nav>
@@ -60,7 +60,7 @@ export default function Layout({ children, title = 'ShadeKits', description = 'C
 
             <div className="px-4 py-4 flex flex-col gap-2 text-base">
               <Link href="/" onClick={() => setOpen(false)} className="nav-mobile-link">Shop</Link>
-              <Link href="/configurator" onClick={() => setOpen(false)} className="nav-mobile-link">Build</Link>
+              <Link href="/builder" onClick={() => setOpen(false)} className="nav-mobile-link">Build</Link>
               <Link href="/resources" onClick={() => setOpen(false)} className="nav-mobile-link">Install Resources</Link>
               <Link href="/contact" onClick={() => setOpen(false)} className="nav-mobile-link">Contact</Link>
 
