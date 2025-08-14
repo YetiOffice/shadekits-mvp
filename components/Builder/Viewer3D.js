@@ -1,11 +1,12 @@
-// components/Builder/Viewer3D.js
 import React, { useMemo, useRef, useEffect } from "react";
+import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei";
 
 // 1 unit = 1 foot. 4x4 post = 4 in = 0.333 ft
 const POST_SIZE = 0.333;
 
+/** Material by finish */
 function useFinishMaterial(finish) {
   return useMemo(() => {
     let color = "#1f2937"; // charcoal/black
@@ -22,6 +23,7 @@ function useFinishMaterial(finish) {
   }, [finish]);
 }
 
+/** Evenly spaced Z lines (bays) */
 function bayLines(length, bays) {
   const arr = [0];
   for (let i = 1; i < bays; i++) arr.push((length * i) / bays);
@@ -29,6 +31,7 @@ function bayLines(length, bays) {
   return arr;
 }
 
+/** Procedural pergola (posts, beams, optional slats, optional ridge) */
 function Pergola({ config }) {
   const { style, span, depth, height, bays, infill, finish } = config;
   const matProps = useFinishMaterial(finish);
@@ -37,6 +40,7 @@ function Pergola({ config }) {
   const backX = 0;
   const yLines = bayLines(depth, bays);
 
+  // Posts
   const posts = useMemo(() => {
     const arr = [];
     for (let i = 0; i < yLines.length; i++) arr.push({ x: frontX, z: yLines[i] });
@@ -46,6 +50,7 @@ function Pergola({ config }) {
     return arr;
   }, [style, frontX, backX, yLines]);
 
+  // Perimeter/front/back beams + side beams on each bay line
   const beams = useMemo(() => {
     const arr = [];
     arr.push({ type: "line", from: { x: frontX, z: 0 }, to: { x: frontX, z: depth }, thickness: POST_SIZE * 1.2 });
@@ -60,6 +65,7 @@ function Pergola({ config }) {
     return arr;
   }, [style, frontX, backX, depth, yLines]);
 
+  // Optional slats
   const slats = useMemo(() => {
     if (!infill || !infill.startsWith("Slats")) return [];
     let spacing = 3;
@@ -80,6 +86,7 @@ function Pergola({ config }) {
     return arr;
   }, [infill, depth, span, style, frontX, backX, height]);
 
+  // Optional ridge for gable
   const gableRidge = useMemo(() => {
     if (style !== "Gable") return null;
     const ridgeX = (frontX + backX) / 2;
@@ -92,6 +99,7 @@ function Pergola({ config }) {
 
   return (
     <group position={[-span / 2, 0, -depth / 2]}>
+      {/* Posts */}
       {posts.map((p, i) => (
         <mesh key={`post-${i}`} position={[p.x, height / 2, p.z]} castShadow receiveShadow>
           <boxGeometry args={[POST_SIZE, height, POST_SIZE]} />
@@ -99,6 +107,7 @@ function Pergola({ config }) {
         </mesh>
       ))}
 
+      {/* Beams */}
       {beams.map((b, i) => {
         const L = beamLen(b.from, b.to);
         const m = midPoint(b.from, b.to);
@@ -111,6 +120,7 @@ function Pergola({ config }) {
         );
       })}
 
+      {/* Slats */}
       {slats.map((s, i) => {
         const L = beamLen(s.from, s.to);
         const m = midPoint(s.from, s.to);
@@ -123,6 +133,7 @@ function Pergola({ config }) {
         );
       })}
 
+      {/* Gable ridge */}
       {gableRidge && (
         <mesh
           position={[
@@ -145,44 +156,68 @@ function Scene({ config, expose }) {
   const { camera, gl, invalidate } = useThree();
   const { span, depth, height } = config;
 
-  // Expose tiny API to parent (capture + camera presets)
+  // Expose setView() + capture() to parent and frame nicely
   useEffect(() => {
     if (!expose) return;
-    const radius = Math.max(span, depth);
-    const centerY = Math.max(height * 0.6, 5);
+
+    const target = new THREE.Vector3(0, height * 0.5, 0);
+    const fovRad = (camera.fov * Math.PI) / 180;
+    const size = Math.max(span, depth);
+
+    // Fit distance for the largest dimension, padded so edges never hug
+    const baseFit = ((size / 2) / Math.tan(fovRad / 2)) * 1.25; // 25% padding
 
     const setView = (preset = "corner") => {
-      if (preset === "front") camera.position.set(radius * 1.2, centerY, 0.01);
-      if (preset === "corner") camera.position.set(radius * 1.2, centerY, radius * 1.2);
-      if (preset === "top") camera.position.set(0.01, radius * 2, 0.01);
-      if (preset === "reset") camera.position.set(radius * 1.2, centerY, radius * 1.2);
-      controlsRef.current?.target.set(0, height * 0.5, 0);
+      controlsRef.current?.target.copy(target);
+
+      if (preset === "top") {
+        // Straight down
+        camera.position.set(0.01, baseFit + height, 0.01);
+      } else if (preset === "front") {
+        // X axis
+        camera.position.set(baseFit, target.y, 0.01);
+      } else if (preset === "corner" || preset === "reset") {
+        // Diagonal X+Z
+        const d = baseFit * 1.15;
+        camera.position.set(d, target.y, d);
+      }
+
+      camera.near = 0.1;
+      camera.far = Math.max(500, size * 50);
+      camera.updateProjectionMatrix();
+
       controlsRef.current?.update();
       invalidate();
     };
 
     const capture = async () => {
-      // ensure a frame is rendered
       invalidate();
       return gl.domElement.toDataURL("image/jpeg", 0.9);
     };
 
     expose({ setView, capture });
+
+    // Nice initial frame
+    setView("corner");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expose, span, depth, height]);
+  }, [expose, span, depth, height, camera, gl, invalidate]);
 
   return (
     <>
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 18, 12]} intensity={0.9} castShadow shadow-mapSize={1024} />
       <Environment preset="city" />
+
       <Pergola config={config} />
+
       <ContactShadows position={[0, 0, 0]} opacity={0.35} scale={Math.max(span, depth) * 2} blur={2.4} far={6} />
+
       <OrbitControls
         ref={controlsRef}
         makeDefault
-        minDistance={6}
-        maxDistance={Math.max(span, depth) * 3}
+        // Prevent “inside the model” zoom, scale with structure size
+        minDistance={Math.max(6, Math.max(span, depth) * 0.8)}
+        maxDistance={Math.max(span, depth) * 3.5}
         maxPolarAngle={Math.PI * 0.48}
       />
     </>
@@ -197,7 +232,10 @@ export default function Viewer3D({ config, expose }) {
     <Canvas
       shadows
       frameloop="demand"
-      camera={{ position: [span * 0.9, Math.max(span, depth) * 0.9, camZ], fov: 40 }}
+      camera={{
+        position: [span * 0.9, Math.max(span, depth) * 0.9, camZ],
+        fov: 45 // a bit wider, feels airier and helps fitting
+      }}
       style={{ width: "100%", height: "520px", borderRadius: "16px" }}
     >
       <color attach="background" args={["#f8fafc"]} />
