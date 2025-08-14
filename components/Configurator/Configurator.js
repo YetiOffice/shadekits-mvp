@@ -19,130 +19,98 @@ export default function Configurator() {
   });
   const [zip, setZip] = useState("");
 
-  const price = useMemo(() => computePrice(cfg, zip), [cfg, zip]);
+  const p = useMemo(() => computePrice(cfg, zip), [cfg, zip]);
   const set = (patch) => setCfg((c) => ({ ...c, ...patch }));
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">Configurator (Legacy)</h1>
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-xl font-semibold mb-4">Configurator (Legacy)</h1>
 
-      {/* Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Column 1 */}
-        <div>
-          <div className="font-medium mb-2">Product</div>
-          {["Mono", "Gable", "AttachedMono"].map((s) => (
-            <button
-              key={s}
-              className={pill(cfg.style === s)}
-              onClick={() => set({ style: s })}
-              type="button"
-            >
-              {s === "Mono" ? "Freestanding Mono" : s === "Gable" ? "Freestanding Gable" : "Attached Mono"}
-            </button>
-          ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Left controls */}
+        <div className="space-y-4">
+          <div>
+            <div className="text-sm font-medium mb-1">Product</div>
+            {["Mono", "Gable", "AttachedMono"].map((s) => (
+              <button key={s} type="button" className={pill(cfg.style === s)} onClick={() => set({ style: s })}>
+                {s === "Mono" ? "Freestanding Mono" : s === "Gable" ? "Freestanding Gable" : "Attached Mono"}
+              </button>
+            ))}
+          </div>
 
-          <div className="font-medium mt-4 mb-2">Infill</div>
-          {["None", "Slats (Open)", "Slats (Medium)", "Slats (Tight)"].map((i) => (
-            <button
-              key={i}
-              className={pill(cfg.infill === i)}
-              onClick={() => set({ infill: i })}
-              type="button"
-            >
-              {i}
-            </button>
-          ))}
+          <div>
+            <div className="text-sm font-medium mb-1">Size</div>
+            {[[10, 10], [12, 12], [12, 20]].map(([w, d]) => (
+              <button
+                key={`${w}x${d}`}
+                type="button"
+                className={pill(cfg.span === w && cfg.depth === d)}
+                onClick={() => set({ span: w, depth: d })}
+              >
+                {w}×{d}
+              </button>
+            ))}
+          </div>
 
-          <div className="font-medium mt-4 mb-2">Finish</div>
-          {["Black", "White", "Bronze", "HDG"].map((f) => (
-            <button
-              key={f}
-              className={pill(cfg.finish === f)}
-              onClick={() => set({ finish: f })}
-              type="button"
-            >
-              {f}
-            </button>
-          ))}
+          <div>
+            <div className="text-sm font-medium mb-1">Finish</div>
+            {["Black", "White", "Bronze", "HDG"].map((f) => (
+              <button key={f} type="button" className={pill(cfg.finish === f)} onClick={() => set({ finish: f })}>
+                {f}
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <div className="text-sm font-medium mb-1">Infill</div>
+            {["None", "Slats (Open)", "Slats (Medium)", "Slats (Tight)"].map((i) => (
+              <button key={i} type="button" className={pill(cfg.infill === i)} onClick={() => set({ infill: i })}>
+                {i}
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <div className="text-sm font-medium mb-1">Anchoring</div>
+            {["Slab", "Footings"].map((a) => (
+              <button key={a} type="button" className={pill(cfg.anchor === a)} onClick={() => set({ anchor: a })}>
+                {a}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Column 2 */}
-        <div>
-          <div className="font-medium mb-2">Size</div>
-          {[10, 12, 20].map((s) => (
-            <button
-              key={s}
-              className={pill(cfg.span === s && cfg.depth === s)}
-              onClick={() => set({ span: s, depth: s })}
-              type="button"
-            >
-              {s}×{s}
-            </button>
-          ))}
-          <button
-            className={pill(cfg.span === 12 && cfg.depth === 20)}
-            onClick={() => set({ span: 12, depth: 20 })}
-            type="button"
-          >
-            12×20
-          </button>
+        {/* Right summary */}
+        <div className="space-y-4">
+          <div>
+            <div className="text-sm font-medium mb-1">ZIP (for freight estimate)</div>
+            <input
+              className="w-full border rounded-md px-3 py-2"
+              placeholder="ZIP code"
+              value={zip}
+              onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
+            />
+          </div>
 
-          <div className="font-medium mt-4 mb-2">Height</div>
-          {[8, 10, 12].map((h) => (
-            <button
-              key={h}
-              className={pill(cfg.height === h)}
-              onClick={() => set({ height: h })}
-              type="button"
-            >
-              {h}′
-            </button>
-          ))}
-
-          <div className="font-medium mt-4 mb-2">Anchoring</div>
-          {["Slab", "Footings"].map((a) => (
-            <button
-              key={a}
-              className={pill(cfg.anchor === a)}
-              onClick={() => set({ anchor: a })}
-              type="button"
-            >
-              {a}
-            </button>
-          ))}
-        </div>
-
-        {/* Column 3 */}
-        <div>
-          <div className="font-medium mb-2">ZIP (for freight estimate)</div>
-          <input
-            className="w-full border rounded-md px-3 py-2"
-            placeholder="ZIP code"
-            value={zip}
-            onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
-          />
-
-          <div className="mt-6 p-4 border rounded-lg bg-neutral-50">
+          <div className="p-4 border rounded-lg bg-neutral-50">
             <div className="text-sm text-neutral-600">Budget Range</div>
             <div className="text-xl font-semibold">
-              {usd(price.budgetLow)} – {usd(price.budgetHigh)}
+              {usd(p.budgetLow)} – {usd(p.budgetHigh)}
             </div>
           </div>
 
-          <div className="mt-3 p-4 border rounded-lg bg-neutral-50">
+          <div className="p-4 border rounded-lg bg-neutral-50">
             <div className="text-sm text-neutral-600">Freight Estimate</div>
             <div className="text-xl font-semibold">
-              {zip.length >= 5 ? `${usd(price.freightLow)} – ${usd(price.freightHigh)}` : "Enter ZIP"}
+              {zip.length >= 5 ? `${usd(p.freightLow)} – ${usd(p.freightHigh)}` : "Enter ZIP"}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Summary */}
-      <div className="text-sm text-neutral-600">
-        Posts modeled as 4×4 (4″ square). Lead time typically 3–5 weeks. Includes pre-cut steel,
-        hardware and anchors as specified, finish schedule and install guide.
+          <div className="text-sm text-neutral-600">
+            Posts modeled as 4×4 (4″ square). Typical lead time 3–5 weeks. Includes pre-cut steel,
+            hardware, anchors as specified, finish schedule, and install guide.
+          </div>
+        </div>
       </div>
     </div>
   );
