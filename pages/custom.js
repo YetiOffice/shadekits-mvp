@@ -1,3 +1,4 @@
+import React from 'react';
 import Head from 'next/head';
 import Layout from '../components/Layout';
 import Section from '../components/Section';
@@ -6,8 +7,12 @@ import { CATALOG } from '../data/products';
 export default function Custom() {
   const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'office@yetiwelding.com';
   const phone = process.env.NEXT_PUBLIC_CONTACT_PHONE || '+18019958906';
+  const FORMSPREE_ID = process.env.NEXT_PUBLIC_FORMSPREE_ID || ''; // e.g., "abcdwxyz"
+  const CALENDLY_URL = process.env.NEXT_PUBLIC_CALENDLY_URL || ''; // e.g., "https://calendly.com/yourname/15min"
 
-  // Build a simple gallery from existing assets so you don't have to upload more right now
+  const [status, setStatus] = React.useState('idle'); // idle | submitting | ok | error
+
+  // Build a simple gallery from existing assets
   const gallery = [
     { src: '/hero.jpg', alt: 'Custom canopy concept' },
     ...CATALOG.map(p => ({ src: p.image || '/hero.jpg', alt: p.name })),
@@ -26,9 +31,8 @@ export default function Custom() {
     'Freight (by region)',
   ];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
+  const mailtoFallback = (form) => {
+    const data = new FormData(form);
     const body =
 `Name: ${data.get('name')}
 Company: ${data.get('company') || ''}
@@ -46,10 +50,41 @@ Budget: ${data.get('budget') || ''}
 Notes:
 ${data.get('notes') || ''}
 
-(If you attached files here, please reply to the email after submit with those files attached so we can review drawings/photos.)`;
+(Files were selected in the form. Please attach them when replying to this email.)`;
 
     const subject = encodeURIComponent('[Custom Inquiry] ShadeKits');
     window.location.href = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(body)}`;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    if (!FORMSPREE_ID) {
+      mailtoFallback(form);
+      return;
+    }
+
+    try {
+      setStatus('submitting');
+      const data = new FormData(form);
+      // Optional: include a subject for Formspree
+      data.append('_subject', '[Custom Inquiry] ShadeKits');
+
+      const res = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
+        method: 'POST',
+        body: data, // includes files if selected
+        headers: { Accept: 'application/json' },
+      });
+
+      if (res.ok) {
+        setStatus('ok');
+        form.reset();
+      } else {
+        setStatus('error');
+      }
+    } catch (err) {
+      setStatus('error');
+    }
   };
 
   return (
@@ -170,7 +205,7 @@ ${data.get('notes') || ''}
         </div>
       </Section>
 
-      {/* MINI CASE STUDIES */}
+      {/* CASE STUDIES */}
       <Section title="Case Studies" className="py-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
@@ -208,7 +243,7 @@ ${data.get('notes') || ''}
       <Section className="py-10" title="Tell Us About Your Project">
         <div id="lead" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="card p-6 lg:col-span-2">
-            <form className="grid grid-cols-1 sm:grid-cols-2 gap-3" onSubmit={handleSubmit}>
+            <form className="grid grid-cols-1 sm:grid-cols-2 gap-3" onSubmit={handleSubmit} encType="multipart/form-data">
               <input className="input" name="name" placeholder="Name *" required />
               <input className="input" name="email" type="email" placeholder="Email *" required />
               <input className="input" name="company" placeholder="Company" />
@@ -222,19 +257,39 @@ ${data.get('notes') || ''}
               <input className="input" name="budget" placeholder="Budget Range" />
               <textarea className="input sm:col-span-2" name="notes" placeholder="Notes (constraints, photos, links)"></textarea>
 
-              {/* Visual file input (mailto cannot attach; we prompt user to email files after submit) */}
+              {/* File input (sent to Formspree when configured) */}
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Files (drawings/photos)</label>
-                <input className="input w-full" type="file" multiple />
-                <div className="text-xs text-neutral-500 mt-1">
-                  After you hit Submit, please attach files in your email reply so we receive drawings/photos.
-                </div>
+                <input className="input w-full" type="file" name="attachments" multiple />
+                {!FORMSPREE_ID && (
+                  <div className="text-xs text-neutral-500 mt-1">
+                    Tip: After you hit Submit, please attach files in your email reply so we receive drawings/photos.
+                  </div>
+                )}
               </div>
 
-              <div className="sm:col-span-2 flex gap-3 mt-2">
-                <button type="submit" className="btn-primary">Send Details</button>
+              <div className="sm:col-span-2 flex flex-wrap gap-3 mt-2">
+                <button type="submit" disabled={status==='submitting'} className="btn-primary">
+                  {status==='submitting' ? 'Sending…' : 'Send Details'}
+                </button>
                 <a href={`tel:${phone}`} className="btn-secondary">Call {phone.replace('+1','')}</a>
+                {CALENDLY_URL && (
+                  <a href={CALENDLY_URL} target="_blank" rel="noreferrer" className="btn-secondary">
+                    Book 15-min Consult
+                  </a>
+                )}
               </div>
+
+              {status === 'ok' && (
+                <div className="sm:col-span-2 mt-3 rounded-xl border border-green-300 bg-green-50 p-3 text-sm">
+                  Thanks! Your details were sent. We’ll reply shortly.
+                </div>
+              )}
+              {status === 'error' && (
+                <div className="sm:col-span-2 mt-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm">
+                  Sorry—something went wrong. Please try again, or email us at <a className="underline" href={`mailto:${email}`}>{email}</a>.
+                </div>
+              )}
             </form>
           </div>
 
