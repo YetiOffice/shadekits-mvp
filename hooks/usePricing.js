@@ -1,22 +1,16 @@
 // hooks/usePricing.js
 import { useMemo } from "react";
-import { computeBudgetRange, usd } from "../lib/pricing";
-import { computeFreightRange } from "../lib/freight";
+import { computePrice, usd } from "../lib/pricing";
 
 export default function usePricing(config, zip) {
   return useMemo(() => {
-    const budget = computeBudgetRange(config);
-    const freight = computeFreightRange(config, zip);
-
-    return {
-      budgetLow: budget.low,
-      budgetHigh: budget.high,
-      budgetUsd: `${usd(budget.low)}–${usd(budget.high)}`,
-      freightLow: freight?.low ?? null,
-      freightHigh: freight?.high ?? null,
-      freightUsd: freight ? `${usd(freight.low)}–${usd(freight.high)}` : "—",
-      breakdown: budget.breakdown,
-      freightMeta: freight ? { zone: freight.zone, area: freight.area } : null,
-    };
+    const p = computePrice(config, zip);
+    const freightUsd =
+      zip && String(zip).length >= 5
+        ? `${usd(p.freightLow)}–${usd(p.freightHigh)}`
+        : "Enter ZIP";
+    return { ...p, freightUsd };
   }, [config, zip]);
 }
+
+export { usd };
