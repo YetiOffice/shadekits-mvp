@@ -1,543 +1,372 @@
 // pages/builder.js
-import React from "react";
-import Head from "next/head";
+import React, { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import {
-  STYLES,
-  FINISHES,
-  INFILL,
-  HEIGHTS,
-  SIZE_PRESETS,
-} from "../data/catalog";
-import { normalizeConfig } from "../lib/configRules";
-import usePricing, { usd } from "../hooks/usePricing";
-import { buildSpec } from "../lib/spec";
-import usePersistedState from "../hooks/usePersistedState";
 
-// viewer (no SSR)
+// ⬇️ Lazy-load the 3D viewer on client only
 const Viewer3D = dynamic(() => import("../components/Builder/Viewer3D"), {
   ssr: false,
+  loading: () => (
+    <div
+      style={{
+        height: 520,
+        display: "grid",
+        placeItems: "center",
+        borderRadius: 12,
+        background: "#f7f8fa",
+      }}
+    >
+      Loading 3D preview…
+    </div>
+  ),
 });
 
-const DEFAULT_CONFIG = {
-  style: "Mono",
-  span: 12,
-  depth: 12,
-  height: 10,
-  bays: 1,
-  infill: "None",
-  finish: "Black",
-  anchor: "Slab",
-};
-
-// ---------- helpers ----------
-function configToQuery(cfg) {
-  const p = new URLSearchParams();
-  p.set("style", cfg.style);
-  p.set("span", String(cfg.span));
-  p.set("depth", String(cfg.depth));
-  p.set("height", String(cfg.height));
-  p.set("infill", cfg.infill);
-  p.set("finish", cfg.finish);
-  p.set("anchor", cfg.anchor);
-  p.set("bays", String(cfg.bays));
-  return p.toString();
-}
-function configFromQuery(search) {
-  const q = new URLSearchParams(search);
-  return {
-    style: q.get("style") || DEFAULT_CONFIG.style,
-    span: Number(q.get("span") || DEFAULT_CONFIG.span),
-    depth: Number(q.get("depth") || DEFAULT_CONFIG.depth),
-    height: Number(q.get("height") || DEFAULT_CONFIG.height),
-    infill: q.get("infill") || DEFAULT_CONFIG.infill,
-    finish: q.get("finish") || DEFAULT_CONFIG.finish,
-    anchor: q.get("anchor") || DEFAULT_CONFIG.anchor,
-    bays: Number(q.get("bays") || DEFAULT_CONFIG.bays),
-  };
-}
-
-function Chip({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "px-3 py-1.5 rounded-full border",
-        active
-          ? "bg-neutral-900 text-white border-neutral-900"
-          : "bg-white hover:bg-neutral-50 border-neutral-300 text-neutral-800",
-      ].join(" ")}
-    >
-      {children}
-    </button>
-  );
+// Small error boundary so we never hit the Vercel “client-side exception” page
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+  }
+  static getDerivedStateFromError(err) {
+    return { hasError: true, message: err?.message || "Unknown error" };
+  }
+  componentDidCatch(err, info) {
+    // Optional: send to your logging here
+    // console.error("3D Error:", err, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          style={{
+            height: 520,
+            borderRadius: 12,
+            background: "#fff4f4",
+            border: "1px solid #ffd6d6",
+            padding: 16,
+            display: "grid",
+            placeItems: "center",
+            textAlign: "center",
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>
+              3D preview failed to load
+            </div>
+            <div style={{ fontSize: 14, color: "#7a3b3b" }}>
+              {this.state.message}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, color: "#7a3b3b" }}>
+              Try reloading the page. If it persists, we’ll take a look.
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function BuilderPage() {
-  // init from URL then normalize
-  const initialConfig = React.useMemo(() => {
-    if (typeof window === "undefined") return DEFAULT_CONFIG;
-    const fromQ = configFromQuery(window.location.search);
-    return normalizeConfig(fromQ).config;
-  }, []);
+  // --- Minimal working state (match what Viewer3D expects) ---
+  const [span, setSpan] = useState(12);     // feet (X)
+  const [depth, setDepth] = useState(12);   // feet (Z)
+  const [height, setHeight] = useState(10); // feet (Y)
+  const [style, setStyle] = useState("FreestandingMono"); // or "AttachedMono"
+  const [infill, setInfill] = useState("none"); // "none" | "open" | "medium" | "tight"
+  const [finish, setFinish] = useState("Black"); // "Black" | "White" | "Bronze" | "HDG"
 
-  // Persisted state for config + form
-  const [config, setConfig] = usePersistedState("builder_config_v1", initialConfig);
-  const [notes, setNotes] = React.useState([]);
-  const [flags, setFlags] = React.useState({ engineerReview: false });
-  const [form, setForm] = usePersistedState("builder_form_v1", {
-    name: "",
-    email: "",
-    phone: "",
-    city: "",
-    zip: "",
-    useCase: "",
-  });
-
-  // 3D API from Viewer (setView, capture)
-  const viewerAPI = React.useRef({ setView: () => {}, capture: async () => null });
-
-  const FORMSPREE = process.env.NEXT_PUBLIC_FORMSPREE_ENDPOINT || "https://formspree.io/f/yourid";
-  const SITE_URL =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (typeof window !== "undefined" ? window.location.origin : "");
-
-  // normalize once on mount (in case persisted state is stale)
-  React.useEffect(() => {
-    const n = normalizeConfig(config);
-    setConfig(n.config);
-    setNotes(n.notes);
-    setFlags(n.flags);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // pricing hook (live, uses form.zip)
-  const pricing = usePricing(config, form.zip);
-
-  const permalink =
-    typeof window !== "undefined"
-      ? `${window.location.origin}${window.location.pathname}?${configToQuery(config)}`
-      : "";
-
-  const specText = React.useMemo(
-    () => buildSpec({ form, config, pricing, notes, flags, permalink }),
-    [form, config, pricing, notes, flags, permalink]
+  const config = useMemo(
+    () => ({ span, depth, height, bays: 1, style, infill, finish }),
+    [span, depth, height, style, infill, finish]
   );
 
-  // Hidden screenshot data URL for Formspree
-  const [screenshot, setScreenshot] = usePersistedState("builder_screenshot_v1", "");
-
-  function update(patch) {
-    const out = normalizeConfig({ ...config, ...patch });
-    setConfig(out.config);
-    setNotes(out.notes);
-    setFlags(out.flags);
-
-    if (typeof window !== "undefined") {
-      const qs = configToQuery(out.config);
-      const url = `${window.location.pathname}?${qs}`;
-      window.history.replaceState({}, "", url);
-    }
-  }
-
-  function handleShare() {
-    if (typeof window === "undefined") return;
-    const qs = configToQuery(config);
-    const url = `${window.location.origin}${window.location.pathname}?${qs}`;
-    navigator.clipboard
-      .writeText(url)
-      .then(() => alert("Link copied to clipboard"))
-      .catch(() => alert("Copy failed — copy from the address bar."));
-  }
-
-  async function handleSnapshot(download = true) {
-    try {
-      const dataUrl = await viewerAPI.current.capture?.();
-      if (!dataUrl) {
-        alert("Couldn’t capture snapshot.");
-        return;
-      }
-      setScreenshot(dataUrl);
-      if (download) {
-        const a = document.createElement("a");
-        a.href = dataUrl;
-        a.download = "shadekits-concept.jpg";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }
-    } catch {
-      alert("Snapshot failed.");
-    }
-  }
-
-  async function handleCopySummary() {
-    try {
-      await navigator.clipboard.writeText(specText);
-      alert("Summary copied to clipboard.");
-    } catch {
-      alert("Copy failed.");
-    }
-  }
-
-  const formRef = React.useRef(null);
-
-  async function handleSubmit(e) {
-    // Auto-capture a snapshot (if none captured yet) and attach it
-    e.preventDefault();
-    try {
-      if (!screenshot && viewerAPI.current.capture) {
-        const shot = await viewerAPI.current.capture();
-        if (shot) setScreenshot(shot);
-        // ensure hidden input has the latest value
-        if (formRef.current?.elements?.screenshot) {
-          formRef.current.elements.screenshot.value = shot || "";
-        }
-      }
-    } catch {}
-    // Submit
-    formRef.current?.submit();
-  }
-
   return (
-    <>
-      <Head>
-        <title>Builder | ShadeKits</title>
-      </Head>
-
-      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6">
-        {/* Header */}
-        <div className="bg-neutral-900 text-white rounded-2xl p-5 md:p-6 mb-6">
-          <div className="text-2xl font-semibold">BUILDER</div>
-          <div className="text-sm md:text-[15px] mt-1 opacity-90">
-            Design a commercial-grade steel pergola in minutes. Live 3D preview, instant
-            budget, ships nationwide.
-          </div>
+    <div style={{ padding: "24px 16px", maxWidth: 1220, margin: "0 auto" }}>
+      <header
+        style={{
+          background: "#0d0f13",
+          color: "white",
+          borderRadius: 14,
+          padding: "18px 18px",
+          marginBottom: 18,
+        }}
+      >
+        <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: 0.3 }}>
+          BUILDER
         </div>
-
-        {/* Toolbar */}
-        <div className="bg-white border border-neutral-200 rounded-2xl p-3 md:p-4 mb-5">
-          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-3">
-            <span className="text-sm font-medium text-neutral-600 mr-2">Product</span>
-            {STYLES.map((s) => (
-              <Chip
-                key={s.id}
-                active={config.style === s.id}
-                onClick={() => update({ style: s.id })}
-              >
-                {s.label}
-              </Chip>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-3">
-            <span className="text-sm font-medium text-neutral-600 mr-2">Finish</span>
-            {FINISHES.map((f) => (
-              <Chip
-                key={f.id}
-                active={config.finish === f.id}
-                onClick={() => update({ finish: f.id })}
-              >
-                {f.label}
-              </Chip>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            <span className="text-sm font-medium text-neutral-600 mr-2">Infill</span>
-            {INFILL.map((i) => (
-              <Chip
-                key={i.id}
-                active={config.infill === i.id}
-                onClick={() => update({ infill: i.id })}
-              >
-                {i.label}
-              </Chip>
-            ))}
-          </div>
-
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              onClick={handleShare}
-              className="px-3 py-1.5 rounded-md text-sm border border-neutral-300 hover:bg-neutral-50"
-              type="button"
-            >
-              Share
-            </button>
-            <button
-              onClick={handleCopySummary}
-              className="px-3 py-1.5 rounded-md text-sm border border-neutral-300 hover:bg-neutral-50"
-              type="button"
-            >
-              Copy Summary
-            </button>
-            <a
-              href="#quote"
-              className="px-4 py-1.5 rounded-md text-sm bg-neutral-900 text-white hover:bg-neutral-800"
-            >
-              Request a Quote
-            </a>
-          </div>
+        <div style={{ opacity: 0.8, marginTop: 6, fontSize: 14 }}>
+          Design a commercial-grade steel pergola in minutes. Live 3D preview,
+          instant budget, ships nationwide.
         </div>
+      </header>
 
-        {/* Main */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* Options */}
-          <div className="lg:col-span-3 bg-white border border-neutral-200 rounded-2xl p-4">
-            {/* Size */}
-            <div className="mb-5">
-              <div className="text-sm font-semibold mb-2">Size</div>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {SIZE_PRESETS.map(({ span, depth }) => {
-                  const active = config.span === span && config.depth === depth;
-                  return (
-                    <Chip
-                      key={`${span}x${depth}`}
-                      active={active}
-                      onClick={() => update({ span, depth })}
-                    >
-                      {span}x{depth}
-                    </Chip>
-                  );
-                })}
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="number"
-                    min={8}
-                    max={30}
-                    value={config.span}
-                    onChange={(e) => update({ span: Number(e.target.value) })}
-                    className="w-20 px-2 py-1 rounded-md border border-neutral-300 text-sm"
-                  />
-                  <span className="text-neutral-500 text-sm">×</span>
-                  <input
-                    type="number"
-                    min={8}
-                    max={30}
-                    value={config.depth}
-                    onChange={(e) => update({ depth: Number(e.target.value) })}
-                    className="w-20 px-2 py-1 rounded-md border border-neutral-300 text-sm"
-                  />
-                </div>
-              </div>
-            </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "300px 1fr 340px",
+          gap: 16,
+          alignItems: "start",
+        }}
+      >
+        {/* -------------------------- Controls (left) -------------------------- */}
+        <div
+          style={{
+            background: "white",
+            borderRadius: 12,
+            padding: 14,
+            border: "1px solid #eee",
+          }}
+        >
+          <Section title="Product">
+            <PillBar
+              value={style}
+              onChange={setStyle}
+              options={[
+                ["FreestandingMono", "Freestanding Mono"],
+                ["AttachedMono", "Attached Mono"],
+              ]}
+            />
+          </Section>
 
-            {/* Height */}
-            <div className="mb-5">
-              <div className="text-sm font-semibold mb-2">Height</div>
-              <div className="flex flex-wrap gap-2">
-                {HEIGHTS.map((h) => (
-                  <Chip key={h} active={config.height === h} onClick={() => update({ height: h })}>
-                    {h}’
-                  </Chip>
-                ))}
-              </div>
-            </div>
+          <Section title="Infill">
+            <PillBar
+              value={infill}
+              onChange={setInfill}
+              options={[
+                ["none", "None"],
+                ["open", "Slats (Open)"],
+                ["medium", "Slats (Medium)"],
+                ["tight", "Slats (Tight)"],
+              ]}
+            />
+          </Section>
 
-            {/* Anchoring */}
-            <div className="mb-5">
-              <div className="text-sm font-semibold mb-2">Anchoring</div>
-              <div className="flex flex-wrap gap-2">
-                <Chip active={config.anchor === "Slab"} onClick={() => update({ anchor: "Slab" })}>
-                  Slab
-                </Chip>
-                <Chip
-                  active={config.anchor === "Footings"}
-                  onClick={() => update({ anchor: "Footings" })}
-                >
-                  Footings
-                </Chip>
-              </div>
-              <div className="mt-2 text-[12px] text-neutral-500">
-                Posts modeled as 4×4 (4&quot; square). Rules auto-add bays based on depth.
-              </div>
-            </div>
-          </div>
-
-          {/* Viewer */}
-          <div className="lg:col-span-6 bg-white border border-neutral-200 rounded-2xl p-2 md:p-3">
-            <div className="aspect-[16/11] w-full rounded-xl overflow-hidden bg-neutral-50">
-              <Viewer3D
-                config={config}
-                expose={(api) => {
-                  // support both expose and ref-style usage
-                  viewerAPI.current = api || viewerAPI.current;
-                }}
-              />
-            </div>
-
-            <div className="flex items-center gap-2 mt-2">
-              <button
-                onClick={() => viewerAPI.current?.setView?.("front")}
-                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
-              >
-                Front
-              </button>
-              <button
-                onClick={() => viewerAPI.current?.setView?.("corner")}
-                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
-              >
-                Corner
-              </button>
-              <button
-                onClick={() => viewerAPI.current?.setView?.("top")}
-                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
-              >
-                Top
-              </button>
-              <button
-                onClick={() => viewerAPI.current?.setView?.("reset")}
-                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
-              >
-                Reset
-              </button>
-              <button
-                onClick={() => handleSnapshot(true)}
-                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
-                title="Download a PNG snapshot"
-              >
-                Snapshot
-              </button>
-            </div>
-
-            <div className="mt-3 text-sm text-neutral-600">
-              <strong className="font-medium">
-                {config.style === "Mono" ? "MONO" : config.style.toUpperCase()}
-              </strong>{" "}
-              • {config.span}×{config.depth} ft • {config.bays}{" "}
-              {config.bays === 1 ? "bay" : "bays"} • {config.height} ft
-            </div>
-
-            {notes.length > 0 && (
-              <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2">
-                {notes.map((n, i) => (
-                  <div key={i}>• {n}</div>
-                ))}
-              </div>
-            )}
-            {flags.engineerReview && (
-              <div className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2">
-                This configuration may require engineering review.
-              </div>
-            )}
-          </div>
-
-          {/* Pricing + Quote */}
-          <div className="lg:col-span-3 bg-white border border-neutral-200 rounded-2xl p-4" id="quote">
-            <div className="text-base font-semibold mb-2">Your Estimate</div>
-
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div className="border border-neutral-200 rounded-lg p-2">
-                <div className="text-[12px] text-neutral-500">Budget Range</div>
-                <div className="text-sm font-semibold">
-                  {usd(pricing.budgetLow)} – {usd(pricing.budgetHigh)}
-                </div>
-              </div>
-              <div className="border border-neutral-200 rounded-lg p-2">
-                <div className="text-[12px] text-neutral-500">Freight Estimate</div>
-                <div className="text-sm font-semibold">
-                  {form.zip?.length >= 5 ? `${usd(pricing.freightLow)} – ${usd(pricing.freightHigh)}` : "Enter ZIP"}
-                </div>
-              </div>
-            </div>
-
-            <div className="text-[12px] text-neutral-600 border border-neutral-200 rounded-lg p-2 mb-3">
-              Lead time: <strong>3–5 weeks</strong>. Includes pre-cut steel, hardware,
-              anchors (as specified), finish schedule, and install guide.
-            </div>
-
-            {/* === Formspree Form (with auto-snapshot attach) === */}
-            <form
-              ref={formRef}
-              action={FORMSPREE}
-              method="POST"
-              className="flex flex-col gap-2"
-              onSubmit={handleSubmit}
-            >
-              {/* Standard fields */}
-              <input
-                name="name"
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="Name *"
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-              <input
-                name="email"
-                type="email"
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="Email *"
-                required
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-              />
-              <input
-                name="phone"
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="Phone"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              />
-              <input
-                name="city"
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="City, State"
-                value={form.city}
-                onChange={(e) => setForm({ ...form, city: e.target.value })}
-              />
-              <input
-                name="zip"
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="ZIP (for freight estimate)"
-                value={form.zip}
-                onChange={(e) =>
-                  setForm({ ...form, zip: e.target.value.replace(/[^\d]/g, "").slice(0, 5) })
-                }
-              />
-              <input
-                name="useCase"
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="Use case (restaurant, park, pool, etc.)"
-                value={form.useCase}
-                onChange={(e) => setForm({ ...form, useCase: e.target.value })}
-              />
-
-              {/* Hidden data for Formspree email */}
-              <textarea name="spec" className="hidden" readOnly value={specText} />
-              <input type="hidden" name="permalink" value={permalink} />
-              <input type="hidden" name="config_json" value={JSON.stringify(config)} />
-              <input type="hidden" name="pricing_json" value={JSON.stringify(pricing)} />
-              <input type="hidden" name="screenshot" value={screenshot || ""} />
-              <input type="hidden" name="_replyto" value={form.email || ""} />
-              <input type="hidden" name="_subject" value="ShadeKits — Builder Concept Request" />
-              <input type="hidden" name="_redirect" value={`${SITE_URL}/thank-you`} />
-
-              <div className="flex items-center gap-2">
-                <button className="mt-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm py-2 px-4" type="submit">
-                  Request Concept &amp; Price
-                </button>
+          <Section title="Size">
+            <SimpleGrid>
+              {[
+                [10, 10],
+                [12, 12],
+                [12, 20],
+              ].map(([w, d]) => (
                 <button
-                  type="button"
-                  onClick={() => handleSnapshot(false)}
-                  className="rounded-md border border-neutral-300 hover:bg-neutral-50 text-sm py-2 px-3"
-                  title="Attach a fresh snapshot to your request"
+                  key={`${w}x${d}`}
+                  onClick={() => {
+                    setSpan(w);
+                    setDepth(d);
+                  }}
+                  className={btnClass(span === w && depth === d)}
                 >
-                  Attach Snapshot
+                  {w}×{d}
                 </button>
-              </div>
-
-              <a
-                className="text-center rounded-md border border-neutral-300 hover:bg-neutral-50 text-sm py-2"
-                href="/contact"
+              ))}
+              <button
+                onClick={() => {
+                  setSpan(20);
+                  setDepth(20);
+                }}
+                className={btnClass(span === 20 && depth === 20)}
               >
-                Prefer full custom?
-              </a>
-            </form>
+                20×20
+              </button>
+            </SimpleGrid>
+          </Section>
+
+          <Section title="Height">
+            <PillBar
+              value={height}
+              onChange={setHeight}
+              options={[
+                [8, "8′"],
+                [10, "10′"],
+                [12, "12′"],
+              ]}
+            />
+          </Section>
+
+          <Section title="Finish">
+            <PillBar
+              value={finish}
+              onChange={setFinish}
+              options={[
+                ["HDG", "HDG"],
+                ["Black", "Black"],
+                ["White", "White"],
+                ["Bronze", "Bronze"],
+              ]}
+            />
+          </Section>
+        </div>
+
+        {/* ---------------------------- 3D viewer ---------------------------- */}
+        <div>
+          <ErrorBoundary>
+            <Viewer3D config={config} />
+          </ErrorBoundary>
+          <div style={{ marginTop: 10, fontSize: 13, color: "#6b7280" }}>
+            MONO • {span}×{depth} ft • 1 bay • {height} ft
           </div>
+        </div>
+
+        {/* ---------------------- Estimate (right side) ---------------------- */}
+        <div
+          style={{
+            background: "white",
+            borderRadius: 12,
+            padding: 14,
+            border: "1px solid #eee",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 10 }}>Your Estimate</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            <InfoCard title="Budget Range" value="$4,800–$5,900" />
+            <InfoCard title="Freight Estimate" value="$700–$1100" />
+          </div>
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1px solid #e5e7eb",
+              padding: 10,
+              borderRadius: 10,
+              fontSize: 13,
+              color: "#334155",
+              marginBottom: 12,
+            }}
+          >
+            Lead time: <b>3–5 weeks</b>. Includes pre-cut steel, hardware,
+            anchors (as specified), finish schedule, and install guide.
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              alert("Request sent!");
+            }}
+            style={{ display: "grid", gap: 8 }}
+          >
+            <input className="sk-input" placeholder="Name *" required />
+            <input className="sk-input" placeholder="Email *" type="email" required />
+            <input className="sk-input" placeholder="Phone" />
+            <input className="sk-input" placeholder="City, State" />
+            <input className="sk-input" placeholder="ZIP (for freight estimate)" />
+            <input
+              className="sk-input"
+              placeholder="Use Case (restaurant, park, pool, etc.)"
+            />
+            <button className="sk-cta" type="submit">
+              Request Concept & Price
+            </button>
+          </form>
         </div>
       </div>
-    </>
+
+      {/* Tiny inline styles for inputs/buttons (to avoid CSS dependencies) */}
+      <style jsx>{`
+        .sk-input {
+          font-size: 14px;
+          padding: 10px 12px;
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
+          outline: none;
+        }
+        .sk-input:focus {
+          border-color: #cbd5e1;
+        }
+        .sk-cta {
+          margin-top: 6px;
+          padding: 10px 12px;
+          border: 0;
+          border-radius: 10px;
+          background: #e11d48;
+          color: white;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .sk-cta:hover {
+          background: #be123c;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ----------------------------- tiny UI helpers ---------------------------- */
+
+function Section({ title, children }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function SimpleGrid({ children }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+      {children}
+    </div>
+  );
+}
+
+function btnClass(active) {
+  return [
+    "sk-btn",
+    active ? "sk-btn--active" : "",
+  ].join(" ");
+}
+
+function PillBar({ value, onChange, options }) {
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      {options.map(([val, label]) => (
+        <button
+          key={String(val)}
+          onClick={() => onChange(val)}
+          className={btnClass(value === val)}
+        >
+          {label}
+        </button>
+      ))}
+      <style jsx>{`
+        .sk-btn {
+          padding: 8px 12px;
+          border-radius: 999px;
+          border: 1px solid #e5e7eb;
+          background: white;
+          font-size: 13px;
+          cursor: pointer;
+        }
+        .sk-btn--active {
+          background: #0f172a;
+          border-color: #0f172a;
+          color: white;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function InfoCard({ title, value }) {
+  return (
+    <div
+      style={{
+        padding: 10,
+        borderRadius: 10,
+        border: "1px solid #e5e7eb",
+        background: "#f8fafc",
+        display: "grid",
+        gap: 4,
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b" }}>{title}</div>
+      <div style={{ fontWeight: 700 }}>{value}</div>
+    </div>
   );
 }
