@@ -10,8 +10,9 @@ import {
   SIZE_PRESETS,
 } from "../data/catalog";
 import { normalizeConfig } from "../lib/configRules";
-import usePricing from "../hooks/usePricing";
+import usePricing, { usd } from "../hooks/usePricing";
 import { buildSpec } from "../lib/spec";
+import usePersistedState from "../hooks/usePersistedState";
 
 // viewer (no SSR)
 const Viewer3D = dynamic(() => import("../components/Builder/Viewer3D"), {
@@ -74,19 +75,18 @@ function Chip({ active, onClick, children }) {
 }
 
 export default function BuilderPage() {
-  // init from URL
-  const initial = React.useMemo(() => {
+  // init from URL then normalize
+  const initialConfig = React.useMemo(() => {
     if (typeof window === "undefined") return DEFAULT_CONFIG;
     const fromQ = configFromQuery(window.location.search);
     return normalizeConfig(fromQ).config;
   }, []);
-  const [config, setConfig] = React.useState(initial);
+
+  // Persisted state for config + form
+  const [config, setConfig] = usePersistedState("builder_config_v1", initialConfig);
   const [notes, setNotes] = React.useState([]);
   const [flags, setFlags] = React.useState({ engineerReview: false });
-  const viewerRef = React.useRef(null);
-
-  // form state (for email)
-  const [form, setForm] = React.useState({
+  const [form, setForm] = usePersistedState("builder_form_v1", {
     name: "",
     email: "",
     phone: "",
@@ -95,12 +95,15 @@ export default function BuilderPage() {
     useCase: "",
   });
 
+  // 3D API from Viewer (setView, capture)
+  const viewerAPI = React.useRef({ setView: () => {}, capture: async () => null });
+
   const FORMSPREE = process.env.NEXT_PUBLIC_FORMSPREE_ENDPOINT || "https://formspree.io/f/yourid";
   const SITE_URL =
     process.env.NEXT_PUBLIC_SITE_URL ||
     (typeof window !== "undefined" ? window.location.origin : "");
 
-  // normalize once on mount
+  // normalize once on mount (in case persisted state is stale)
   React.useEffect(() => {
     const n = normalizeConfig(config);
     setConfig(n.config);
@@ -109,7 +112,7 @@ export default function BuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // pricing hook (live)
+  // pricing hook (live, uses form.zip)
   const pricing = usePricing(config, form.zip);
 
   const permalink =
@@ -121,6 +124,9 @@ export default function BuilderPage() {
     () => buildSpec({ form, config, pricing, notes, flags, permalink }),
     [form, config, pricing, notes, flags, permalink]
   );
+
+  // Hidden screenshot data URL for Formspree
+  const [screenshot, setScreenshot] = usePersistedState("builder_screenshot_v1", "");
 
   function update(patch) {
     const out = normalizeConfig({ ...config, ...patch });
@@ -142,7 +148,56 @@ export default function BuilderPage() {
     navigator.clipboard
       .writeText(url)
       .then(() => alert("Link copied to clipboard"))
-      .catch(() => alert("Copy failed — you can copy from the address bar."));
+      .catch(() => alert("Copy failed — copy from the address bar."));
+  }
+
+  async function handleSnapshot(download = true) {
+    try {
+      const dataUrl = await viewerAPI.current.capture?.();
+      if (!dataUrl) {
+        alert("Couldn’t capture snapshot.");
+        return;
+      }
+      setScreenshot(dataUrl);
+      if (download) {
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = "shadekits-concept.jpg";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    } catch {
+      alert("Snapshot failed.");
+    }
+  }
+
+  async function handleCopySummary() {
+    try {
+      await navigator.clipboard.writeText(specText);
+      alert("Summary copied to clipboard.");
+    } catch {
+      alert("Copy failed.");
+    }
+  }
+
+  const formRef = React.useRef(null);
+
+  async function handleSubmit(e) {
+    // Auto-capture a snapshot (if none captured yet) and attach it
+    e.preventDefault();
+    try {
+      if (!screenshot && viewerAPI.current.capture) {
+        const shot = await viewerAPI.current.capture();
+        if (shot) setScreenshot(shot);
+        // ensure hidden input has the latest value
+        if (formRef.current?.elements?.screenshot) {
+          formRef.current.elements.screenshot.value = shot || "";
+        }
+      }
+    } catch {}
+    // Submit
+    formRef.current?.submit();
   }
 
   return (
@@ -209,6 +264,13 @@ export default function BuilderPage() {
               type="button"
             >
               Share
+            </button>
+            <button
+              onClick={handleCopySummary}
+              className="px-3 py-1.5 rounded-md text-sm border border-neutral-300 hover:bg-neutral-50"
+              type="button"
+            >
+              Copy Summary
             </button>
             <a
               href="#quote"
@@ -296,33 +358,46 @@ export default function BuilderPage() {
           {/* Viewer */}
           <div className="lg:col-span-6 bg-white border border-neutral-200 rounded-2xl p-2 md:p-3">
             <div className="aspect-[16/11] w-full rounded-xl overflow-hidden bg-neutral-50">
-              <Viewer3D ref={viewerRef} config={config} />
+              <Viewer3D
+                config={config}
+                expose={(api) => {
+                  // support both expose and ref-style usage
+                  viewerAPI.current = api || viewerAPI.current;
+                }}
+              />
             </div>
 
             <div className="flex items-center gap-2 mt-2">
               <button
-                onClick={() => viewerRef.current?.setView?.("front")}
+                onClick={() => viewerAPI.current?.setView?.("front")}
                 className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
               >
                 Front
               </button>
               <button
-                onClick={() => viewerRef.current?.setView?.("corner")}
+                onClick={() => viewerAPI.current?.setView?.("corner")}
                 className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
               >
                 Corner
               </button>
               <button
-                onClick={() => viewerRef.current?.setView?.("top")}
+                onClick={() => viewerAPI.current?.setView?.("top")}
                 className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
               >
                 Top
               </button>
               <button
-                onClick={() => viewerRef.current?.setView?.("reset")}
+                onClick={() => viewerAPI.current?.setView?.("reset")}
                 className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
               >
                 Reset
+              </button>
+              <button
+                onClick={() => handleSnapshot(true)}
+                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
+                title="Download a PNG snapshot"
+              >
+                Snapshot
               </button>
             </div>
 
@@ -356,23 +431,13 @@ export default function BuilderPage() {
               <div className="border border-neutral-200 rounded-lg p-2">
                 <div className="text-[12px] text-neutral-500">Budget Range</div>
                 <div className="text-sm font-semibold">
-                  {Intl.NumberFormat("en-US", {
-                    style: "currency",
-                    currency: "USD",
-                    maximumFractionDigits: 0,
-                  }).format(pricing.budgetLow)}{" "}
-                  –{" "}
-                  {Intl.NumberFormat("en-US", {
-                    style: "currency",
-                    currency: "USD",
-                    maximumFractionDigits: 0,
-                  }).format(pricing.budgetHigh)}
+                  {usd(pricing.budgetLow)} – {usd(pricing.budgetHigh)}
                 </div>
               </div>
               <div className="border border-neutral-200 rounded-lg p-2">
                 <div className="text-[12px] text-neutral-500">Freight Estimate</div>
                 <div className="text-sm font-semibold">
-                  {form.zip?.length >= 5 ? pricing.freightUsd : "Enter ZIP"}
+                  {form.zip?.length >= 5 ? `${usd(pricing.freightLow)} – ${usd(pricing.freightHigh)}` : "Enter ZIP"}
                 </div>
               </div>
             </div>
@@ -382,11 +447,13 @@ export default function BuilderPage() {
               anchors (as specified), finish schedule, and install guide.
             </div>
 
-            {/* === Formspree Form === */}
+            {/* === Formspree Form (with auto-snapshot attach) === */}
             <form
+              ref={formRef}
               action={FORMSPREE}
               method="POST"
               className="flex flex-col gap-2"
+              onSubmit={handleSubmit}
             >
               {/* Standard fields */}
               <input
@@ -440,13 +507,27 @@ export default function BuilderPage() {
               {/* Hidden data for Formspree email */}
               <textarea name="spec" className="hidden" readOnly value={specText} />
               <input type="hidden" name="permalink" value={permalink} />
+              <input type="hidden" name="config_json" value={JSON.stringify(config)} />
+              <input type="hidden" name="pricing_json" value={JSON.stringify(pricing)} />
+              <input type="hidden" name="screenshot" value={screenshot || ""} />
               <input type="hidden" name="_replyto" value={form.email || ""} />
               <input type="hidden" name="_subject" value="ShadeKits — Builder Concept Request" />
               <input type="hidden" name="_redirect" value={`${SITE_URL}/thank-you`} />
 
-              <button className="mt-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm py-2" type="submit">
-                Request Concept &amp; Price
-              </button>
+              <div className="flex items-center gap-2">
+                <button className="mt-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm py-2 px-4" type="submit">
+                  Request Concept &amp; Price
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSnapshot(false)}
+                  className="rounded-md border border-neutral-300 hover:bg-neutral-50 text-sm py-2 px-3"
+                  title="Attach a fresh snapshot to your request"
+                >
+                  Attach Snapshot
+                </button>
+              </div>
+
               <a
                 className="text-center rounded-md border border-neutral-300 hover:bg-neutral-50 text-sm py-2"
                 href="/contact"
