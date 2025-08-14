@@ -1,5 +1,4 @@
-// components/Configurator/Configurator.js
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { computePrice, usd } from "../../lib/pricing";
 
 const pill = (active) =>
@@ -9,19 +8,18 @@ const pill = (active) =>
 
 export default function Configurator() {
   const [cfg, setCfg] = useState({
-    style: "Mono",    // Mono | Gable | AttachedMono (names aligned with Builder)
+    style: "Mono",        // Mono | Gable | AttachedMono
     span: 12,
     depth: 12,
     height: 10,
-    infill: "None",   // None | Slats (Open) | Slats (Medium) | Slats (Tight)
-    finish: "Black",  // Black | White | Bronze | HDG
-    anchor: "Slab",   // Slab | Footings
+    infill: "None",       // None | Slats (Open) | Slats (Medium) | Slats (Tight)
+    finish: "Black",      // Black | White | Bronze | HDG
+    anchor: "Slab",       // Slab | Footings
     bays: 1,
   });
   const [zip, setZip] = useState("");
 
   const price = useMemo(() => computePrice(cfg, zip), [cfg, zip]);
-
   const set = (patch) => setCfg((c) => ({ ...c, ...patch }));
 
   return (
@@ -30,6 +28,7 @@ export default function Configurator() {
 
       {/* Controls */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Column 1 */}
         <div>
           <div className="font-medium mb-2">Product</div>
           {["Mono", "Gable", "AttachedMono"].map((s) => (
@@ -68,6 +67,7 @@ export default function Configurator() {
           ))}
         </div>
 
+        {/* Column 2 */}
         <div>
           <div className="font-medium mb-2">Size</div>
           {[10, 12, 20].map((s) => (
@@ -113,6 +113,7 @@ export default function Configurator() {
           ))}
         </div>
 
+        {/* Column 3 */}
         <div>
           <div className="font-medium mb-2">ZIP (for freight estimate)</div>
           <input
@@ -121,3 +122,28 @@ export default function Configurator() {
             value={zip}
             onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
           />
+
+          <div className="mt-6 p-4 border rounded-lg bg-neutral-50">
+            <div className="text-sm text-neutral-600">Budget Range</div>
+            <div className="text-xl font-semibold">
+              {usd(price.budgetLow)} – {usd(price.budgetHigh)}
+            </div>
+          </div>
+
+          <div className="mt-3 p-4 border rounded-lg bg-neutral-50">
+            <div className="text-sm text-neutral-600">Freight Estimate</div>
+            <div className="text-xl font-semibold">
+              {zip.length >= 5 ? `${usd(price.freightLow)} – ${usd(price.freightHigh)}` : "Enter ZIP"}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="text-sm text-neutral-600">
+        Posts modeled as 4×4 (4″ square). Lead time typically 3–5 weeks. Includes pre-cut steel,
+        hardware and anchors as specified, finish schedule and install guide.
+      </div>
+    </div>
+  );
+}
