@@ -1,273 +1,368 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import * as THREE from "three";
+// components/Builder/Viewer3D.js
+import { useRef, useMemo, useEffect, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, ContactShadows, Environment } from "@react-three/drei";
-import * as ReactDOM from "react-dom";
+import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
+import { createPortal } from "react-dom";
 
-// ====== Tunables ======
-const POST_SIZE = 0.333;          // 4" ~ 0.333 ft
-const BEAM_SIZE = 0.333;          // 4" beams
-const SLAT_THICK = 0.125;         // ~1.5"
-const SLAT_SPACING = {
-  None: Infinity,
-  SlatsOpen: 0.25 * 4,            // ~3" -> in ft
-  SlatsMedium: 0.125 * 12,        // ~1.5"
-  SlatsTight: 0.0833 * 12,        // ~1"
-};
-const COLORS = {
-  Black: "#111111",
-  White: "#f4f4f4",
-  Bronze: "#3a2a1d",
-  HDG: "#a8b1b6",                 // galvanized steel look
+/**
+ * === Public API ===
+ * <Viewer3D
+ *   config={{
+ *     span: 12,         // feet (X)
+ *     depth: 12,        // feet (Z)
+ *     height: 10,       // feet (Y)
+ *     bays: 1,          // for future use; mono example keeps 4 posts
+ *     style: "FreestandingMono", // "FreestandingGable" | "AttachedMono" (basic support)
+ *     infill: "tight",  // "none" | "open" | "medium" | "tight"
+ *     finish: "Black"   // "Black" | "White" | "Bronze" | "HDG"
+ *   }}
+ * />
+ */
+
+/* ---------------------------- Helper utilities ---------------------------- */
+
+const POST_SIZE = 0.15; // ~ 3.5-4" (scene units ~= feet)
+const BEAM_SIZE = 0.18;
+
+const FINISH_COLORS = {
+  Black: "#111418",
+  White: "#EAEBEF",
+  Bronze: "#6e5a4b",
+  HDG: "#a5adb2",
 };
 
-function materialForFinish(finish) {
-  const color = COLORS[finish] || COLORS.Black;
-  const metal = finish === "HDG" ? 0.9 : 0.1;
-  const rough = finish === "HDG" ? 0.35 : 0.6;
-  return new THREE.MeshStandardMaterial({ color, metalness: metal, roughness: rough });
+function colorFromFinish(name) {
+  return FINISH_COLORS[name] || FINISH_COLORS.Black;
 }
 
-// ====== Geometry ======
-function Posts({ config }) {
-  const { span, depth, bays, height, style } = config;
-  const mat = useMemo(() => materialForFinish(config.finish), [config.finish]);
+/** Compute slat spacing by preset */
+function spacingFromInfill(infill) {
+  switch ((infill || "none").toLowerCase()) {
+    case "open":
+      return 1.2;
+    case "medium":
+      return 0.9;
+    case "tight":
+      return 0.6;
+    default:
+      return null; // none
+  }
+}
 
-  const positions = [];
-  const bayCount = Math.max(1, bays || 1);
-  const zSteps = bayCount === 1 ? [] : Array.from({ length: bayCount - 1 }, (_, i) => ((i + 1) * depth) / bayCount);
+/** Fit camera to a box with margin (returns suggested distance) */
+function fitCameraToBox(camera, controls, box3, margin = 1.35) {
+  const size = new THREE.Vector3();
+  box3.getSize(size);
 
-  if (style !== "AttachedMono") {
-    positions.push([0, 0, 0], [span, 0, 0], [0, 0, depth], [span, 0, depth]);
-    for (const z of zSteps) positions.push([0, 0, z], [span, 0, z]);
-  } else {
-    positions.push([0, 0, 0], [span, 0, 0]);
-    for (const z of zSteps) positions.push([0, 0, z], [span, 0, z]);
+  const center = new THREE.Vector3();
+  box3.getCenter(center);
+
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = (camera.fov * Math.PI) / 180.0;
+  const dist = (maxDim * margin) / (2 * Math.tan(fov / 2));
+
+  // Place camera at a corner-ish angle
+  const dir = new THREE.Vector3(1, 0.8, 1).normalize();
+  const newPos = center.clone().add(dir.multiplyScalar(dist));
+
+  camera.position.copy(newPos);
+  camera.near = Math.max(0.01, dist / 100);
+  camera.far = dist * 100;
+  camera.updateProjectionMatrix();
+
+  if (controls) {
+    controls.target.copy(center);
+    controls.update();
   }
 
-  return (
-    <group>
-      {positions.map(([x, y, z], i) => (
-        <mesh key={i} position={[x, POST_SIZE / 2 + y, z]} material={mat} castShadow receiveShadow>
-          <boxGeometry args={[POST_SIZE, height, POST_SIZE]} />
-        </mesh>
-      ))}
-    </group>
-  );
+  return { center, dist };
 }
 
-function Frame({ config }) {
-  const { span, depth, height } = config;
-  const mat = useMemo(() => materialForFinish(config.finish), [config.finish]);
-  const y = height + BEAM_SIZE / 2;
+/** Smooth fly animation helper */
+function useFly(camera, controls) {
+  const anim = useRef(null);
 
-  const beams = [
-    { pos: [span / 2, y, 0],     args: [span + BEAM_SIZE, BEAM_SIZE, BEAM_SIZE] },
-    { pos: [span / 2, y, depth], args: [span + BEAM_SIZE, BEAM_SIZE, BEAM_SIZE] },
-    { pos: [0, y, depth / 2],    args: [BEAM_SIZE, BEAM_SIZE, depth + BEAM_SIZE] },
-    { pos: [span, y, depth / 2], args: [BEAM_SIZE, BEAM_SIZE, depth + BEAM_SIZE] },
-  ];
+  useFrame((_, delta) => {
+    if (!anim.current) return;
+    const t = Math.min(1, (anim.current.t += delta / anim.current.dur));
+    // smoothstep
+    const s = t * t * (3 - 2 * t);
 
-  return (
-    <group>
-      {beams.map((b, i) => (
-        <mesh key={i} position={b.pos} material={mat} castShadow receiveShadow>
-          <boxGeometry args={b.args} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
+    camera.position.lerpVectors(anim.current.fromPos, anim.current.toPos, s);
+    controls.target.lerpVectors(anim.current.fromTar, anim.current.toTar, s);
+    controls.update();
 
-function Slats({ config }) {
-  const { span, depth, height, infill } = config;
-  if (infill === "None") return null;
-  const spacing = SLAT_SPACING[infill] ?? SLAT_SPACING.SlatsMedium;
-  const mat = useMemo(() => materialForFinish(config.finish), [config.finish]);
-  const y = height + BEAM_SIZE + SLAT_THICK / 2;
+    if (t >= 1) anim.current = null;
+  });
 
-  const slats = [];
-  for (let x = 0; x <= span; x += spacing) {
-    slats.push(
-      <mesh key={`s${x}`} position={[x, y, depth / 2]} material={mat} castShadow receiveShadow>
-        <boxGeometry args={[SLAT_THICK, SLAT_THICK, depth - BEAM_SIZE * 1.25]} />
-      </mesh>
-    );
-  }
-  return <group>{slats}</group>;
-}
-
-// ====== Camera fit & API ======
-function useFitCamera(config, controlsRef) {
-  const { camera, size } = useThree();
-  const target = useMemo(() => new THREE.Vector3(config.span / 2, config.height / 2, config.depth / 2), [config]);
-
-  useEffect(() => {
-    const margin = 1.4;
-    const fov = THREE.MathUtils.degToRad(Number(camera.fov || 50)); // <-- JS-safe
-    const box = new THREE.Box3(
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(config.span, config.height + 2, config.depth)
-    );
-    const sizeVec = new THREE.Vector3();
-    box.getSize(sizeVec);
-    const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
-    const dist = (maxDim / (2 * Math.tan(fov / 2))) * margin;
-
-    const dir = new THREE.Vector3(-0.8, 0.6, 1.0).normalize();
-    const newPos = target.clone().add(dir.multiplyScalar(dist));
-    camera.position.copy(newPos);
-    camera.near = 0.01;
-    camera.far = Math.max(500, dist * 10);
-    camera.updateProjectionMatrix();
-
-    if (controlsRef.current) {
-      controlsRef.current.target.copy(target);
-      controlsRef.current.update();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.span, config.depth, config.height, size.width, size.height]);
-
-  return target;
-}
-
-function ControlsExposed({ expose, controlsRef, targetRef }) {
-  const { camera, gl, scene } = useThree();
-
-  useEffect(() => {
-    const api = {
-      setView: (view) => {
-        const t = targetRef.current;
-        const boxSize = Math.max(10, camera.position.distanceTo(t));
-        if (view === "front") camera.position.set(t.x, t.y, t.z + boxSize);
-        else if (view === "top") camera.position.set(t.x, t.y + boxSize, t.z);
-        else if (view === "corner") camera.position.set(t.x + boxSize, t.y + boxSize * 0.6, t.z + boxSize);
-        else if (view === "reset") { /* useFitCamera already frames */ }
-        controlsRef.current?.target.copy(t);
-        controlsRef.current?.update();
-      },
-      capture: async () => {
-        // ensure the latest frame is drawn
-        gl.render(scene, camera);
-        return gl.domElement.toDataURL("image/jpeg", 0.92);
-      },
+  const flyTo = (toPos, toTar, dur = 0.8) => {
+    anim.current = {
+      fromPos: camera.position.clone(),
+      fromTar: controls.target.clone(),
+      toPos: toPos.clone(),
+      toTar: toTar.clone(),
+      t: 0,
+      dur,
     };
-    if (typeof expose === "function") expose(api);
-    return () => { if (typeof expose === "function") expose(null); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expose]);
+  };
 
-  return null;
+  return flyTo;
 }
 
-// ====== Scene ======
-function Scene({ config, expose }) {
+/* ---------------------------- Scene Components --------------------------- */
+
+function Pergola({ config }) {
+  const {
+    span = 12,
+    depth = 12,
+    height = 10,
+    style = "FreestandingMono",
+    infill = "none",
+    finish = "Black",
+  } = config || {};
+
+  const color = colorFromFinish(finish);
+  const slatSpacing = spacingFromInfill(infill);
+
+  /**
+   * Geometry memo
+   */
+  const data = useMemo(() => {
+    const posts = [];
+    const beams = [];
+    const slats = [];
+
+    // Post positions (mono, 4-corners). AttachedMono omits the back row.
+    const corners = [
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(span, 0, 0),
+      ...(style === "AttachedMono" ? [] : [new THREE.Vector3(0, 0, depth), new THREE.Vector3(span, 0, depth)]),
+    ];
+
+    corners.forEach((p) => posts.push({ pos: new THREE.Vector3(p.x, height / 2, p.z), size: new THREE.Vector3(POST_SIZE, height, POST_SIZE) }));
+
+    // Perimeter beams (top rectangle). AttachedMono omits the back beam.
+    const Y = height;
+    beams.push(
+      { from: new THREE.Vector3(0, Y, 0), to: new THREE.Vector3(span, Y, 0) }, // front X
+    );
+    if (style !== "AttachedMono") {
+      beams.push({ from: new THREE.Vector3(0, Y, depth), to: new THREE.Vector3(span, Y, depth) }); // back X
+      beams.push({ from: new THREE.Vector3(0, Y, 0), to: new THREE.Vector3(0, Y, depth) }); // left Z
+      beams.push({ from: new THREE.Vector3(span, Y, 0), to: new THREE.Vector3(span, Y, depth) }); // right Z
+    } else {
+      // for attached, still draw left/right beam from wall (z=0) to front (z=0)
+      beams.push({ from: new THREE.Vector3(0, Y, 0), to: new THREE.Vector3(0, Y, POST_SIZE * 0.5) });
+      beams.push({ from: new THREE.Vector3(span, Y, 0), to: new THREE.Vector3(span, Y, POST_SIZE * 0.5) });
+    }
+
+    // Slats along X, sitting on top, spanning front->back (Z)
+    if (slatSpacing) {
+      const pad = BEAM_SIZE * 0.5 + POST_SIZE * 0.5;
+      for (let x = pad; x <= span - pad + 1e-5; x += slatSpacing) {
+        const from = new THREE.Vector3(x, Y + BEAM_SIZE * 0.6, 0);
+        const to = new THREE.Vector3(x, Y + BEAM_SIZE * 0.6, Math.max(depth, POST_SIZE * 0.8));
+        slats.push({ from, to });
+      }
+    }
+
+    return { posts, beams, slats };
+  }, [config, span, depth, height, style, infill, finish]);
+
+  return (
+    <group>
+      {/* posts */}
+      {data.posts.map((p, i) => (
+        <mesh key={`post-${i}`} position={p.pos} castShadow receiveShadow>
+          <boxGeometry args={[p.size.x, p.size.y, p.size.z]} />
+          <meshStandardMaterial color={color} roughness={0.75} metalness={finish === "HDG" ? 0.55 : 0.15} />
+        </mesh>
+      ))}
+
+      {/* beams */}
+      {data.beams.map((b, i) => {
+        const dir = new THREE.Vector3().subVectors(b.to, b.from);
+        const len = dir.length();
+        const mid = new THREE.Vector3().addVectors(b.from, b.to).multiplyScalar(0.5);
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir.clone().normalize());
+        return (
+          <mesh key={`beam-${i}`} position={mid} quaternion={quat} castShadow receiveShadow>
+            <boxGeometry args={[len, BEAM_SIZE, BEAM_SIZE]} />
+            <meshStandardMaterial color={color} roughness={0.75} metalness={finish === "HDG" ? 0.55 : 0.15} />
+          </mesh>
+        );
+      })}
+
+      {/* slats */}
+      {data.slats.map((s, i) => {
+        const dir = new THREE.Vector3().subVectors(s.to, s.from);
+        const len = dir.length();
+        const mid = new THREE.Vector3().addVectors(s.from, s.to).multiplyScalar(0.5);
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().normalize());
+        return (
+          <mesh key={`slat-${i}`} position={mid} quaternion={quat} castShadow receiveShadow>
+            <boxGeometry args={[BEAM_SIZE * 0.8, BEAM_SIZE * 0.45, len]} />
+            <meshStandardMaterial color={color} roughness={0.8} metalness={finish === "HDG" ? 0.45 : 0.1} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+/* -------- Safe client-only HTML overlay (no document on SSR) -------- */
+
+function HtmlOverlay({ children }) {
+  const { gl } = useThree();
+  const [el, setEl] = useState(null);
+
+  // Create the element only on the client
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const div = document.createElement("div");
+    setEl(div);
+  }, []);
+
+  // Attach to the canvas parent
+  useEffect(() => {
+    if (!el) return;
+    const parent = gl.domElement.parentNode;
+    if (!parent) return;
+
+    el.style.position = "absolute";
+    el.style.left = "50%";
+    el.style.bottom = "10px";
+    el.style.transform = "translateX(-50%)";
+    el.style.pointerEvents = "none";
+    el.style.zIndex = "1";
+
+    parent.appendChild(el);
+    return () => {
+      try {
+        parent.removeChild(el);
+      } catch {}
+    };
+  }, [gl, el]);
+
+  if (!el) return null;
+  return createPortal(children, el);
+}
+
+/* ------------------------------- R3F Scene ------------------------------- */
+
+function Scene({ config }) {
+  const groupRef = useRef();
   const controlsRef = useRef();
-  const targetRef = useRef(new THREE.Vector3(config.span / 2, config.height / 2, config.depth / 2));
-  const [interacted, setInteracted] = useState(false);
+  const { camera, gl, size } = useThree();
+  const flyTo = useFly(camera, controlsRef.current ?? { target: new THREE.Vector3(), update() {} });
 
-  const target = useFitCamera(config, controlsRef);
-  useEffect(() => { targetRef.current.copy(target); }, [target]);
+  // Initial frame when ready or config changes
+  useEffect(() => {
+    if (!groupRef.current) return;
+    const box = new THREE.Box3().setFromObject(groupRef.current);
+    fitCameraToBox(camera, controlsRef.current, box, 1.4);
+    gl.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  }, [camera, gl, size.width, size.height, config]);
 
-  useFrame(() => { controlsRef.current && controlsRef.current.update(); });
+  // Control buttons
+  const onFront = () => {
+    const box = new THREE.Box3().setFromObject(groupRef.current);
+    const { center, dist } = fitCameraToBox(camera, controlsRef.current, box, 1.2);
+    const pos = center.clone().add(new THREE.Vector3(0, dist * 0.35, dist));
+    flyTo(pos, center);
+  };
+  const onCorner = () => {
+    const box = new THREE.Box3().setFromObject(groupRef.current);
+    const { center, dist } = fitCameraToBox(camera, controlsRef.current, box, 1.2);
+    const pos = center.clone().add(new THREE.Vector3(dist, dist * 0.55, dist));
+    flyTo(pos, center);
+  };
+  const onTop = () => {
+    const box = new THREE.Box3().setFromObject(groupRef.current);
+    const { center, dist } = fitCameraToBox(camera, controlsRef.current, box, 1.2);
+    const pos = center.clone().add(new THREE.Vector3(0.001, dist * 1.6, 0.001));
+    flyTo(pos, center);
+  };
+  const onReset = () => {
+    const box = new THREE.Box3().setFromObject(groupRef.current);
+    fitCameraToBox(camera, controlsRef.current, box, 1.35);
+  };
 
   return (
     <>
-      {/* Ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[500, 500]} />
-        <meshStandardMaterial color="#fafafa" roughness={1} metalness={0} />
-      </mesh>
-
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[10, 20, 15]} intensity={0.7} castShadow />
-      <Environment preset="city" />
-
-      {/* Model */}
-      <group position={[0, POST_SIZE / 2, 0]}>
-        <Posts config={config} />
-        <Frame config={config} />
-        <Slats config={config} />
+      {/* Lights */}
+      <ambientLight intensity={0.5} />
+      <directionalLight
+        castShadow
+        intensity={0.9}
+        position={[15, 25, 20]}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+      />
+      <group ref={groupRef} position={[0, 0, 0]}>
+        <Pergola config={config} />
       </group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[200, 200]} />
+        <shadowMaterial transparent opacity={0.15} />
+      </mesh>
+      <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.08} />
 
-      <ContactShadows
-        position={[config.span / 2, 0, config.depth / 2]}
-        opacity={0.25}
-        scale={Math.max(20, config.span + config.depth + 10)}
-        blur={1.5}
-        far={20}
-      />
-
-      <OrbitControls
-        ref={controlsRef}
-        enableDamping
-        dampingFactor={0.08}
-        minDistance={2}
-        maxDistance={200}
-        maxPolarAngle={Math.PI * 0.499}
-        onStart={() => setInteracted(true)}
-      />
-
-      <ControlsExposed expose={expose} controlsRef={controlsRef} targetRef={targetRef} />
-
-      {!interacted && (
-        <HtmlOverlay>
-          <div className="text-xs md:text-sm bg-white/90 backdrop-blur rounded-md border border-neutral-200 px-3 py-2 text-neutral-700 shadow-sm">
-            Drag to rotate • Scroll to zoom • Right-click to pan
-          </div>
-        </HtmlOverlay>
-      )}
+      {/* Overlay buttons */}
+      <HtmlOverlay>
+        <div style={{ display: "flex", gap: 8, pointerEvents: "auto" }}>
+          {[
+            ["Front", onFront],
+            ["Corner", onCorner],
+            ["Top", onTop],
+            ["Reset", onReset],
+          ].map(([label, fn]) => (
+            <button
+              key={label}
+              onClick={fn}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 10,
+                border: "1px solid rgba(0,0,0,.12)",
+                background: "rgba(255,255,255,.9)",
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </HtmlOverlay>
     </>
   );
 }
 
-// Minimal HTML overlay helper using a portal
-function HtmlOverlay({ children }) {
-  const { gl } = useThree();
-  const [el] = useState(() => document.createElement("div"));
-  useEffect(() => {
-    const parent = gl.domElement.parentNode;
-    if (!parent) return;
-    el.style.position = "absolute";
-    el.style.left = "50%";
-    el.style.top = "12px";
-    el.style.transform = "translateX(-50%)";
-    el.style.pointerEvents = "none";
-    parent.appendChild(el);
-    return () => { parent.removeChild(el); };
-  }, [gl, el]);
-  return ReactDOM.createPortal(children, el);
-}
+/* ------------------------------ Public Viewer ---------------------------- */
 
-// ====== Public component ======
-export default function Viewer3D({ config, expose }) {
-  const safeConfig = useMemo(() => ({
-    style: config?.style || "Mono",
-    span: Number(config?.span || 12),
-    depth: Number(config?.depth || 12),
-    height: Number(config?.height || 10),
-    bays: Number(config?.bays || 1),
-    infill: config?.infill || "None",
-    finish: config?.finish || "Black",
-    anchor: config?.anchor || "Slab",
-  }), [config]);
-
-  const [ready, setReady] = useState(false);
+export default function Viewer3D({ config }) {
+  // Safe defaults in case parent omits some fields
+  const safe = {
+    span: 12,
+    depth: 12,
+    height: 10,
+    bays: 1,
+    style: "FreestandingMono",
+    infill: "none",
+    finish: "Black",
+    ...(config || {}),
+  };
 
   return (
-    <div className="w-full h-full relative">
-      {!ready && (
-        <div className="absolute inset-0 grid place-items-center text-neutral-500 text-sm">
-          Loading 3D…
-        </div>
-      )}
+    <div style={{ width: "100%", height: 520, position: "relative", borderRadius: 12, overflow: "hidden" }}>
       <Canvas
         shadows
-        gl={{ preserveDrawingBuffer: true }}   // helps reliable snapshots
-        onCreated={() => setReady(true)}
-        camera={{ fov: 50, near: 0.01, far: 1000 }}
+        camera={{ fov: 45, near: 0.1, far: 1000, position: [safe.span * 0.8, safe.height * 0.7, safe.depth * 1.4] }}
+        gl={{ antialias: true }}
       >
-        <Scene config={safeConfig} expose={expose} />
+        <color attach="background" args={["#f7f8fa"]} />
+        <Scene config={safe} />
       </Canvas>
     </div>
   );
