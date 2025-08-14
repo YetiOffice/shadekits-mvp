@@ -11,6 +11,7 @@ import {
 } from "../data/catalog";
 import { normalizeConfig } from "../lib/configRules";
 import usePricing from "../hooks/usePricing";
+import { buildSpec } from "../lib/spec";
 
 // viewer (no SSR)
 const Viewer3D = dynamic(() => import("../components/Builder/Viewer3D"), {
@@ -82,8 +83,22 @@ export default function BuilderPage() {
   const [config, setConfig] = React.useState(initial);
   const [notes, setNotes] = React.useState([]);
   const [flags, setFlags] = React.useState({ engineerReview: false });
-  const [zip, setZip] = React.useState(""); // <— new
   const viewerRef = React.useRef(null);
+
+  // form state (for email)
+  const [form, setForm] = React.useState({
+    name: "",
+    email: "",
+    phone: "",
+    city: "",
+    zip: "",
+    useCase: "",
+  });
+
+  const FORMSPREE = process.env.NEXT_PUBLIC_FORMSPREE_ENDPOINT || "https://formspree.io/f/yourid";
+  const SITE_URL =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "");
 
   // normalize once on mount
   React.useEffect(() => {
@@ -95,7 +110,17 @@ export default function BuilderPage() {
   }, []);
 
   // pricing hook (live)
-  const pricing = usePricing(config, zip);
+  const pricing = usePricing(config, form.zip);
+
+  const permalink =
+    typeof window !== "undefined"
+      ? `${window.location.origin}${window.location.pathname}?${configToQuery(config)}`
+      : "";
+
+  const specText = React.useMemo(
+    () => buildSpec({ form, config, pricing, notes, flags, permalink }),
+    [form, config, pricing, notes, flags, permalink]
+  );
 
   function update(patch) {
     const out = normalizeConfig({ ...config, ...patch });
@@ -330,12 +355,24 @@ export default function BuilderPage() {
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="border border-neutral-200 rounded-lg p-2">
                 <div className="text-[12px] text-neutral-500">Budget Range</div>
-                <div className="text-sm font-semibold">{pricing.budgetUsd}</div>
+                <div className="text-sm font-semibold">
+                  {Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                    maximumFractionDigits: 0,
+                  }).format(pricing.budgetLow)}{" "}
+                  –{" "}
+                  {Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                    maximumFractionDigits: 0,
+                  }).format(pricing.budgetHigh)}
+                </div>
               </div>
               <div className="border border-neutral-200 rounded-lg p-2">
                 <div className="text-[12px] text-neutral-500">Freight Estimate</div>
                 <div className="text-sm font-semibold">
-                  {zip && zip.length >= 5 ? pricing.freightUsd : "Enter ZIP"}
+                  {form.zip?.length >= 5 ? pricing.freightUsd : "Enter ZIP"}
                 </div>
               </div>
             </div>
@@ -345,31 +382,78 @@ export default function BuilderPage() {
               anchors (as specified), finish schedule, and install guide.
             </div>
 
-            {/* Quote form (still simple) */}
-            <div className="flex flex-col gap-2">
-              <input className="px-3 py-2 text-sm rounded-md border border-neutral-300" placeholder="Name *" />
-              <input className="px-3 py-2 text-sm rounded-md border border-neutral-300" placeholder="Email *" type="email" />
-              <input className="px-3 py-2 text-sm rounded-md border border-neutral-300" placeholder="Phone" />
-              <input className="px-3 py-2 text-sm rounded-md border border-neutral-300" placeholder="City, State" />
-
-              {/* ZIP wired to freight */}
+            {/* === Formspree Form === */}
+            <form
+              action={FORMSPREE}
+              method="POST"
+              className="flex flex-col gap-2"
+            >
+              {/* Standard fields */}
               <input
+                name="name"
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="Name *"
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+              <input
+                name="email"
+                type="email"
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="Email *"
+                required
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+              <input
+                name="phone"
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="Phone"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+              <input
+                name="city"
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="City, State"
+                value={form.city}
+                onChange={(e) => setForm({ ...form, city: e.target.value })}
+              />
+              <input
+                name="zip"
                 className="px-3 py-2 text-sm rounded-md border border-neutral-300"
                 placeholder="ZIP (for freight estimate)"
-                value={zip}
-                onChange={(e) => setZip(e.target.value.replace(/[^\d]/g, "").slice(0, 5))}
+                value={form.zip}
+                onChange={(e) =>
+                  setForm({ ...form, zip: e.target.value.replace(/[^\d]/g, "").slice(0, 5) })
+                }
               />
               <input
+                name="useCase"
                 className="px-3 py-2 text-sm rounded-md border border-neutral-300"
                 placeholder="Use case (restaurant, park, pool, etc.)"
+                value={form.useCase}
+                onChange={(e) => setForm({ ...form, useCase: e.target.value })}
               />
-              <button className="mt-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm py-2" type="button">
+
+              {/* Hidden data for Formspree email */}
+              <textarea name="spec" className="hidden" readOnly value={specText} />
+              <input type="hidden" name="permalink" value={permalink} />
+              <input type="hidden" name="_replyto" value={form.email || ""} />
+              <input type="hidden" name="_subject" value="ShadeKits — Builder Concept Request" />
+              <input type="hidden" name="_redirect" value={`${SITE_URL}/thank-you`} />
+
+              <button className="mt-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm py-2" type="submit">
                 Request Concept &amp; Price
               </button>
-              <button className="rounded-md border border-neutral-300 hover:bg-neutral-50 text-sm py-2" type="button">
+              <a
+                className="text-center rounded-md border border-neutral-300 hover:bg-neutral-50 text-sm py-2"
+                href="/contact"
+              >
                 Prefer full custom?
-              </button>
-            </div>
+              </a>
+            </form>
           </div>
         </div>
       </div>
