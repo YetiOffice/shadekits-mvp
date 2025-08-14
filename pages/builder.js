@@ -205,3 +205,211 @@ export default function BuilderPage() {
             </a>
           </div>
         </div>
+
+        {/* Main grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* Left: Options */}
+          <div className="lg:col-span-3 bg-white border border-neutral-200 rounded-2xl p-4">
+            {/* Size */}
+            <div className="mb-5">
+              <div className="text-sm font-semibold mb-2">Size</div>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {SIZE_PRESETS.map(({ span, depth }) => {
+                  const active =
+                    config.span === span && config.depth === depth;
+                  return (
+                    <Chip
+                      key={`${span}x${depth}`}
+                      active={active}
+                      onClick={() => update({ span, depth })}
+                    >
+                      {span}x{depth}
+                    </Chip>
+                  );
+                })}
+                {/* Custom quick inputs */}
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    min={8}
+                    max={30}
+                    value={config.span}
+                    onChange={(e) => update({ span: Number(e.target.value) })}
+                    className="w-20 px-2 py-1 rounded-md border border-neutral-300 text-sm"
+                  />
+                  <span className="text-neutral-500 text-sm">×</span>
+                  <input
+                    type="number"
+                    min={8}
+                    max={30}
+                    value={config.depth}
+                    onChange={(e) => update({ depth: Number(e.target.value) })}
+                    className="w-20 px-2 py-1 rounded-md border border-neutral-300 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Height */}
+            <div className="mb-5">
+              <div className="text-sm font-semibold mb-2">Height</div>
+              <div className="flex flex-wrap gap-2">
+                {HEIGHTS.map((h) => (
+                  <Chip
+                    key={h}
+                    active={config.height === h}
+                    onClick={() => update({ height: h })}
+                  >
+                    {h}’
+                  </Chip>
+                ))}
+              </div>
+            </div>
+
+            {/* Anchoring */}
+            <div className="mb-5">
+              <div className="text-sm font-semibold mb-2">Anchoring</div>
+              <div className="flex flex-wrap gap-2">
+                <Chip
+                  active={config.anchor === "Slab"}
+                  onClick={() => update({ anchor: "Slab" })}
+                >
+                  Slab
+                </Chip>
+                <Chip
+                  active={config.anchor === "Footings"}
+                  onClick={() => update({ anchor: "Footings" })}
+                >
+                  Footings
+                </Chip>
+              </div>
+              <div className="mt-2 text-[12px] text-neutral-500">
+                Posts modeled as 4×4 (4&quot; square). Rules auto-add bays based on depth.
+              </div>
+            </div>
+          </div>
+
+          {/* Center: 3D Viewer */}
+          <div className="lg:col-span-6 bg-white border border-neutral-200 rounded-2xl p-2 md:p-3">
+            <div className="aspect-[16/11] w-full rounded-xl overflow-hidden bg-neutral-50">
+              <Viewer3D ref={viewerRef} config={config} />
+            </div>
+
+            {/* Camera controls */}
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={() => viewerRef.current?.setView?.("front")}
+                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
+              >
+                Front
+              </button>
+              <button
+                onClick={() => viewerRef.current?.setView?.("corner")}
+                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
+              >
+                Corner
+              </button>
+              <button
+                onClick={() => viewerRef.current?.setView?.("top")}
+                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
+              >
+                Top
+              </button>
+              <button
+                onClick={() => viewerRef.current?.setView?.("reset")}
+                className="px-3 py-1.5 text-sm rounded-md border border-neutral-300 hover:bg-neutral-50"
+              >
+                Reset
+              </button>
+            </div>
+
+            {/* Footer summary + notes */}
+            <div className="mt-3 text-sm text-neutral-600">
+              <strong className="font-medium">
+                {config.style === "Mono" ? "MONO" : config.style.toUpperCase()}
+              </strong>{" "}
+              • {config.span}×{config.depth} ft • {config.bays}{" "}
+              {config.bays === 1 ? "bay" : "bays"} • {config.height} ft
+            </div>
+
+            {notes.length > 0 && (
+              <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2">
+                {notes.map((n, i) => (
+                  <div key={i}>• {n}</div>
+                ))}
+              </div>
+            )}
+            {flags.engineerReview && (
+              <div className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2">
+                This configuration may require engineering review.
+              </div>
+            )}
+          </div>
+
+          {/* Right: Estimate + form (placeholder for now) */}
+          <div className="lg:col-span-3 bg-white border border-neutral-200 rounded-2xl p-4" id="quote">
+            <div className="text-base font-semibold mb-2">Your Estimate</div>
+
+            {/* Budget + Freight (pricing engine comes in step 2) */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="border border-neutral-200 rounded-lg p-2">
+                <div className="text-[12px] text-neutral-500">Budget Range</div>
+                <div className="text-sm font-semibold">—</div>
+              </div>
+              <div className="border border-neutral-200 rounded-lg p-2">
+                <div className="text-[12px] text-neutral-500">Freight Estimate</div>
+                <div className="text-sm font-semibold">—</div>
+              </div>
+            </div>
+
+            <div className="text-[12px] text-neutral-600 border border-neutral-200 rounded-lg p-2 mb-3">
+              Lead time: <strong>3–5 weeks</strong>. Includes pre-cut steel, hardware,
+              anchors (as specified), finish schedule, and install guide.
+            </div>
+
+            {/* Simple placeholder form; we’ll wire Formspree & payload in a later step */}
+            <div className="flex flex-col gap-2">
+              <input
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="Name *"
+              />
+              <input
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="Email *"
+                type="email"
+              />
+              <input
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="Phone"
+              />
+              <input
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="City, State"
+              />
+              <input
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="ZIP (for freight estimate)"
+              />
+              <input
+                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
+                placeholder="Use case (restaurant, park, pool, etc.)"
+              />
+              <button
+                className="mt-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm py-2"
+                type="button"
+              >
+                Request Concept &amp; Price
+              </button>
+              <button
+                className="rounded-md border border-neutral-300 hover:bg-neutral-50 text-sm py-2"
+                type="button"
+              >
+                Prefer full custom?
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
