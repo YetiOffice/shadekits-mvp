@@ -243,4 +243,105 @@ export default function Builder() {
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Left: quick size/height controls */}
         <div className="lg:col-span-3">
-          <div className="rounded-2xl border bg-white p
+          <div className="rounded-2xl border bg-white p-4">
+            <h3 className="font-semibold">Size</h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {["10x10", "12x12", "12x20", "20x20", "Custom"].map((p) => (
+                <button key={p} className={chip(sizePreset === p)} onClick={() => setSizePreset(p)}>{p}</button>
+              ))}
+            </div>
+
+            {sizePreset === "Custom" && (
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <label>Span (ft)</label>
+                  <input type="number" className="w-24 rounded-md border px-2 py-1" min={10} max={20} value={span}
+                    onChange={(e) => setSpan(Number(e.target.value))}/>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <label>Depth (ft)</label>
+                  <input type="number" className="w-24 rounded-md border px-2 py-1" min={10} max={40} value={depth}
+                    onChange={(e) => setDepth(Number(e.target.value))}/>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <h3 className="font-semibold">Height</h3>
+              <div className="mt-2 flex gap-2">
+                {[8, 10, 12].map((h) => (
+                  <button key={h} className={chip(height === h)} onClick={() => setHeight(h)}>{h}′</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <h3 className="font-semibold">Anchoring</h3>
+              <div className="mt-2 flex gap-2">
+                {["Slab", "Footings"].map((a) => (
+                  <button key={a} className={chip(anchoring === a)} onClick={() => setAnchoring(a)}>{a}</button>
+                ))}
+              </div>
+            </div>
+
+            <p className="mt-3 text-xs text-neutral-500">Posts modeled as 4×4 (4&quot; square). Rules auto-add bays based on depth.</p>
+          </div>
+        </div>
+
+        {/* Center: 3D viewer + camera presets */}
+        <div className="lg:col-span-6">
+          <div className="rounded-2xl border bg-white p-3">
+            <Viewer3D config={config} expose={setViewerAPI} />
+            <div className="mt-2 flex items-center justify-between">
+              <div className="text-sm text-neutral-600">
+                {style === "Mono" ? "MONO" : style === "Gable" ? "GABLE" : "ATTACHED MONO"} • {span}×{depth} ft • {bays} {bays === 1 ? "bay" : "bays"} • {height} ft
+              </div>
+              <div className="flex gap-2">
+                <button className="rounded-xl border px-3 py-1 text-sm hover:bg-neutral-50" onClick={() => viewerAPI?.setView?.("front")}>Front</button>
+                <button className="rounded-xl border px-3 py-1 text-sm hover:bg-neutral-50" onClick={() => viewerAPI?.setView?.("corner")}>Corner</button>
+                <button className="rounded-xl border px-3 py-1 text-sm hover:bg-neutral-50" onClick={() => viewerAPI?.setView?.("top")}>Top</button>
+                <button className="rounded-xl border px-3 py-1 text-sm hover:bg-neutral-50" onClick={() => viewerAPI?.setView?.("reset")}>Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: estimate + short form */}
+        <div className="lg:col-span-3" id="quote">
+          <div className="rounded-2xl border bg-white p-4">
+            <h3 className="font-semibold">Your Estimate</h3>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-xl border p-3">
+                <div className="text-xs text-neutral-500">Budget Range</div>
+                <div className="font-semibold">${budgetLow.toLocaleString()}–${budgetHigh.toLocaleString()}</div>
+              </div>
+              <div className="rounded-xl border p-3">
+                <div className="text-xs text-neutral-500">Freight Estimate</div>
+                <div className="font-semibold">${freightLow}–${freightHigh}</div>
+              </div>
+            </div>
+            <div className="mt-2 rounded-xl border p-3 text-xs text-neutral-600">
+              Lead time: <strong>3–5 weeks</strong>. Includes pre-cut steel, hardware, anchors (as specified), finish schedule, and install guide.
+            </div>
+
+            <form className="mt-3 space-y-2" onSubmit={submit} action={formsEndpoint} method="POST">
+              <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Name *" value={name} onChange={(e)=>setName(e.target.value)} required />
+              <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Email *" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+              <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Phone" value={phone} onChange={(e)=>setPhone(e.target.value)} />
+              <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="City, State" value={cityState} onChange={(e)=>setCityState(e.target.value)} />
+              <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="ZIP (for freight estimate)" value={zip} onChange={(e)=>setZip(e.target.value.replace(/[^0-9]/g,''))} />
+              <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Use Case (restaurant, park, pool, etc.)" value={usecase} onChange={(e)=>setUsecase(e.target.value)} />
+              <button className="mt-1 w-full rounded-xl bg-red-600 px-4 py-2 text-white text-sm font-semibold hover:bg-red-700" type="submit">
+                Request Concept & Price
+              </button>
+            </form>
+
+            <a href="/custom" className="mt-2 inline-flex w-full items-center justify-center rounded-xl border px-4 py-2 text-sm hover:bg-neutral-50">
+              Prefer full custom?
+            </a>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}
