@@ -1,6 +1,7 @@
 // pages/builder.js
 import React from "react";
 import Head from "next/head";
+import dynamic from "next/dynamic";
 import {
   STYLES,
   FINISHES,
@@ -9,9 +10,9 @@ import {
   SIZE_PRESETS,
 } from "../data/catalog";
 import { normalizeConfig } from "../lib/configRules";
-import dynamic from "next/dynamic";
+import usePricing from "../hooks/usePricing";
 
-// Dynamically import the 3D viewer to avoid SSR issues with three.js
+// viewer (no SSR)
 const Viewer3D = dynamic(() => import("../components/Builder/Viewer3D"), {
   ssr: false,
 });
@@ -27,44 +28,33 @@ const DEFAULT_CONFIG = {
   anchor: "Slab",
 };
 
-// ---------- Helpers: shareable URL ----------
+// ---------- helpers ----------
 function configToQuery(cfg) {
-  const params = new URLSearchParams();
-  params.set("style", cfg.style);
-  params.set("span", String(cfg.span));
-  params.set("depth", String(cfg.depth));
-  params.set("height", String(cfg.height));
-  params.set("infill", cfg.infill);
-  params.set("finish", cfg.finish);
-  params.set("anchor", cfg.anchor);
-  params.set("bays", String(cfg.bays));
-  return params.toString();
+  const p = new URLSearchParams();
+  p.set("style", cfg.style);
+  p.set("span", String(cfg.span));
+  p.set("depth", String(cfg.depth));
+  p.set("height", String(cfg.height));
+  p.set("infill", cfg.infill);
+  p.set("finish", cfg.finish);
+  p.set("anchor", cfg.anchor);
+  p.set("bays", String(cfg.bays));
+  return p.toString();
 }
-
 function configFromQuery(search) {
   const q = new URLSearchParams(search);
-  const span = Number(q.get("span") || DEFAULT_CONFIG.span);
-  const depth = Number(q.get("depth") || DEFAULT_CONFIG.depth);
-  const height = Number(q.get("height") || DEFAULT_CONFIG.height);
-  const bays = Number(q.get("bays") || DEFAULT_CONFIG.bays);
-  const style = q.get("style") || DEFAULT_CONFIG.style;
-  const infill = q.get("infill") || DEFAULT_CONFIG.infill;
-  const finish = q.get("finish") || DEFAULT_CONFIG.finish;
-  const anchor = q.get("anchor") || DEFAULT_CONFIG.anchor;
-
   return {
-    style,
-    span,
-    depth,
-    height,
-    bays,
-    infill,
-    finish,
-    anchor,
+    style: q.get("style") || DEFAULT_CONFIG.style,
+    span: Number(q.get("span") || DEFAULT_CONFIG.span),
+    depth: Number(q.get("depth") || DEFAULT_CONFIG.depth),
+    height: Number(q.get("height") || DEFAULT_CONFIG.height),
+    infill: q.get("infill") || DEFAULT_CONFIG.infill,
+    finish: q.get("finish") || DEFAULT_CONFIG.finish,
+    anchor: q.get("anchor") || DEFAULT_CONFIG.anchor,
+    bays: Number(q.get("bays") || DEFAULT_CONFIG.bays),
   };
 }
 
-// ---------- UI chip ----------
 function Chip({ active, onClick, children }) {
   return (
     <button
@@ -83,34 +73,36 @@ function Chip({ active, onClick, children }) {
 }
 
 export default function BuilderPage() {
-  // load initial from URL if present
+  // init from URL
   const initial = React.useMemo(() => {
     if (typeof window === "undefined") return DEFAULT_CONFIG;
     const fromQ = configFromQuery(window.location.search);
     return normalizeConfig(fromQ).config;
   }, []);
-
   const [config, setConfig] = React.useState(initial);
   const [notes, setNotes] = React.useState([]);
   const [flags, setFlags] = React.useState({ engineerReview: false });
+  const [zip, setZip] = React.useState(""); // <— new
   const viewerRef = React.useRef(null);
 
-  // Ensure normalization whenever config changes externally (URL paste etc.)
+  // normalize once on mount
   React.useEffect(() => {
-    const normalized = normalizeConfig(config);
-    setConfig(normalized.config);
-    setNotes(normalized.notes);
-    setFlags(normalized.flags);
+    const n = normalizeConfig(config);
+    setConfig(n.config);
+    setNotes(n.notes);
+    setFlags(n.flags);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Central updater: always normalize & store notes/flags
+  // pricing hook (live)
+  const pricing = usePricing(config, zip);
+
   function update(patch) {
     const out = normalizeConfig({ ...config, ...patch });
     setConfig(out.config);
     setNotes(out.notes);
     setFlags(out.flags);
-    // keep the URL in sync (nice touch)
+
     if (typeof window !== "undefined") {
       const qs = configToQuery(out.config);
       const url = `${window.location.pathname}?${qs}`;
@@ -125,7 +117,7 @@ export default function BuilderPage() {
     navigator.clipboard
       .writeText(url)
       .then(() => alert("Link copied to clipboard"))
-      .catch(() => alert("Copy failed — you can manually copy from the address bar."));
+      .catch(() => alert("Copy failed — you can copy from the address bar."));
   }
 
   return (
@@ -144,9 +136,8 @@ export default function BuilderPage() {
           </div>
         </div>
 
-        {/* Toolbar row */}
+        {/* Toolbar */}
         <div className="bg-white border border-neutral-200 rounded-2xl p-3 md:p-4 mb-5">
-          {/* Product */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-3">
             <span className="text-sm font-medium text-neutral-600 mr-2">Product</span>
             {STYLES.map((s) => (
@@ -160,7 +151,6 @@ export default function BuilderPage() {
             ))}
           </div>
 
-          {/* Finish */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-3">
             <span className="text-sm font-medium text-neutral-600 mr-2">Finish</span>
             {FINISHES.map((f) => (
@@ -174,7 +164,6 @@ export default function BuilderPage() {
             ))}
           </div>
 
-          {/* Infill */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
             <span className="text-sm font-medium text-neutral-600 mr-2">Infill</span>
             {INFILL.map((i) => (
@@ -188,7 +177,6 @@ export default function BuilderPage() {
             ))}
           </div>
 
-          {/* Actions */}
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={handleShare}
@@ -206,17 +194,16 @@ export default function BuilderPage() {
           </div>
         </div>
 
-        {/* Main grid */}
+        {/* Main */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* Left: Options */}
+          {/* Options */}
           <div className="lg:col-span-3 bg-white border border-neutral-200 rounded-2xl p-4">
             {/* Size */}
             <div className="mb-5">
               <div className="text-sm font-semibold mb-2">Size</div>
               <div className="flex flex-wrap gap-2 mb-2">
                 {SIZE_PRESETS.map(({ span, depth }) => {
-                  const active =
-                    config.span === span && config.depth === depth;
+                  const active = config.span === span && config.depth === depth;
                   return (
                     <Chip
                       key={`${span}x${depth}`}
@@ -227,7 +214,6 @@ export default function BuilderPage() {
                     </Chip>
                   );
                 })}
-                {/* Custom quick inputs */}
                 <div className="flex items-center gap-2 mt-1">
                   <input
                     type="number"
@@ -255,11 +241,7 @@ export default function BuilderPage() {
               <div className="text-sm font-semibold mb-2">Height</div>
               <div className="flex flex-wrap gap-2">
                 {HEIGHTS.map((h) => (
-                  <Chip
-                    key={h}
-                    active={config.height === h}
-                    onClick={() => update({ height: h })}
-                  >
+                  <Chip key={h} active={config.height === h} onClick={() => update({ height: h })}>
                     {h}’
                   </Chip>
                 ))}
@@ -270,10 +252,7 @@ export default function BuilderPage() {
             <div className="mb-5">
               <div className="text-sm font-semibold mb-2">Anchoring</div>
               <div className="flex flex-wrap gap-2">
-                <Chip
-                  active={config.anchor === "Slab"}
-                  onClick={() => update({ anchor: "Slab" })}
-                >
+                <Chip active={config.anchor === "Slab"} onClick={() => update({ anchor: "Slab" })}>
                   Slab
                 </Chip>
                 <Chip
@@ -289,13 +268,12 @@ export default function BuilderPage() {
             </div>
           </div>
 
-          {/* Center: 3D Viewer */}
+          {/* Viewer */}
           <div className="lg:col-span-6 bg-white border border-neutral-200 rounded-2xl p-2 md:p-3">
             <div className="aspect-[16/11] w-full rounded-xl overflow-hidden bg-neutral-50">
               <Viewer3D ref={viewerRef} config={config} />
             </div>
 
-            {/* Camera controls */}
             <div className="flex items-center gap-2 mt-2">
               <button
                 onClick={() => viewerRef.current?.setView?.("front")}
@@ -323,7 +301,6 @@ export default function BuilderPage() {
               </button>
             </div>
 
-            {/* Footer summary + notes */}
             <div className="mt-3 text-sm text-neutral-600">
               <strong className="font-medium">
                 {config.style === "Mono" ? "MONO" : config.style.toUpperCase()}
@@ -346,19 +323,20 @@ export default function BuilderPage() {
             )}
           </div>
 
-          {/* Right: Estimate + form (placeholder for now) */}
+          {/* Pricing + Quote */}
           <div className="lg:col-span-3 bg-white border border-neutral-200 rounded-2xl p-4" id="quote">
             <div className="text-base font-semibold mb-2">Your Estimate</div>
 
-            {/* Budget + Freight (pricing engine comes in step 2) */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="border border-neutral-200 rounded-lg p-2">
                 <div className="text-[12px] text-neutral-500">Budget Range</div>
-                <div className="text-sm font-semibold">—</div>
+                <div className="text-sm font-semibold">{pricing.budgetUsd}</div>
               </div>
               <div className="border border-neutral-200 rounded-lg p-2">
                 <div className="text-[12px] text-neutral-500">Freight Estimate</div>
-                <div className="text-sm font-semibold">—</div>
+                <div className="text-sm font-semibold">
+                  {zip && zip.length >= 5 ? pricing.freightUsd : "Enter ZIP"}
+                </div>
               </div>
             </div>
 
@@ -367,43 +345,28 @@ export default function BuilderPage() {
               anchors (as specified), finish schedule, and install guide.
             </div>
 
-            {/* Simple placeholder form; we’ll wire Formspree & payload in a later step */}
+            {/* Quote form (still simple) */}
             <div className="flex flex-col gap-2">
-              <input
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="Name *"
-              />
-              <input
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="Email *"
-                type="email"
-              />
-              <input
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="Phone"
-              />
-              <input
-                className="px-3 py-2 text-sm rounded-md border border-neutral-300"
-                placeholder="City, State"
-              />
+              <input className="px-3 py-2 text-sm rounded-md border border-neutral-300" placeholder="Name *" />
+              <input className="px-3 py-2 text-sm rounded-md border border-neutral-300" placeholder="Email *" type="email" />
+              <input className="px-3 py-2 text-sm rounded-md border border-neutral-300" placeholder="Phone" />
+              <input className="px-3 py-2 text-sm rounded-md border border-neutral-300" placeholder="City, State" />
+
+              {/* ZIP wired to freight */}
               <input
                 className="px-3 py-2 text-sm rounded-md border border-neutral-300"
                 placeholder="ZIP (for freight estimate)"
+                value={zip}
+                onChange={(e) => setZip(e.target.value.replace(/[^\d]/g, "").slice(0, 5))}
               />
               <input
                 className="px-3 py-2 text-sm rounded-md border border-neutral-300"
                 placeholder="Use case (restaurant, park, pool, etc.)"
               />
-              <button
-                className="mt-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm py-2"
-                type="button"
-              >
+              <button className="mt-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm py-2" type="button">
                 Request Concept &amp; Price
               </button>
-              <button
-                className="rounded-md border border-neutral-300 hover:bg-neutral-50 text-sm py-2"
-                type="button"
-              >
+              <button className="rounded-md border border-neutral-300 hover:bg-neutral-50 text-sm py-2" type="button">
                 Prefer full custom?
               </button>
             </div>
