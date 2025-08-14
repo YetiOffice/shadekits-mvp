@@ -1,10 +1,30 @@
 import Head from 'next/head';
 import Layout from '../components/Layout';
 import Section from '../components/Section';
+import { CATALOG } from '../data/products';
 
 export default function Custom() {
   const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'office@yetiwelding.com';
   const phone = process.env.NEXT_PUBLIC_CONTACT_PHONE || '+18019958906';
+
+  // Build a simple gallery from existing assets so you don't have to upload more right now
+  const gallery = [
+    { src: '/hero.jpg', alt: 'Custom canopy concept' },
+    ...CATALOG.map(p => ({ src: p.image || '/hero.jpg', alt: p.name })),
+  ].slice(0, 6);
+
+  const budget = [
+    { size: '10×10', range: '$3k–$5k', notes: 'Base frame, standard height' },
+    { size: '12×12', range: '$4k–$7k', notes: 'Base frame, standard height' },
+    { size: '20×20', range: '$8k–$12k', notes: 'Base frame, standard height' },
+  ];
+  const adders = [
+    'Extra clearance height',
+    'Side panels / slats',
+    'Premium powder coat',
+    'PE-stamped drawings',
+    'Freight (by region)',
+  ];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -26,26 +46,20 @@ Budget: ${data.get('budget') || ''}
 Notes:
 ${data.get('notes') || ''}
 
-(If you attached files here, please reply to this email with those files attached so we can review drawings/photos.)`;
-    const subject = encodeURIComponent('[Custom Inquiry] ShadeKits');
-    const mailto = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailto;
-  };
+(If you attached files here, please reply to the email after submit with those files attached so we can review drawings/photos.)`;
 
-  const gallery = [
-    { src: '/hero.jpg', alt: 'Custom canopy concept' },
-    { src: '/patio-pro-10x10.jpg', alt: 'Steel frame detail' },
-    { src: '/pavilion-12x12.jpg', alt: 'Pavilion example' },
-    { src: '/cafe-cover-20x20.jpg', alt: 'Commercial cover' },
-    { src: '/patio-pro-10x10.jpg', alt: 'Project install' },
-    { src: '/pavilion-12x12.jpg', alt: 'Site adaptation' },
-  ];
+    const subject = encodeURIComponent('[Custom Inquiry] ShadeKits');
+    window.location.href = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(body)}`;
+  };
 
   return (
     <Layout>
       <Head>
         <title>Custom Shade Structures — ShadeKits</title>
-        <meta name="description" content="Engineered, bolt-together shade structures customized to your site. Fast quoting, stamped drawings available." />
+        <meta
+          name="description"
+          content="Engineered, bolt-together steel shade structures customized to your site. Concept to PE-stamped drawings, fabrication, and freight."
+        />
       </Head>
 
       {/* HERO */}
@@ -55,10 +69,10 @@ ${data.get('notes') || ''}
             <img src="/hero.jpg" alt="Custom Shade Structures" className="w-full h-full object-cover" />
           </div>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-            <span className="badge">Stamped drawings available</span>
+            <span className="badge">PE-stamped drawings available</span>
             <h1 className="mt-3 text-4xl md:text-6xl font-extrabold tracking-tight">Custom Shade Structures</h1>
             <p className="mt-3 max-w-3xl text-neutral-700">
-              Engineered, bolt-together steel built for your site. From concept sketch to PE-stamped drawings, fabrication, and freight.
+              Engineered, bolt-together steel built for your site. From concept sketch to budgetary price, engineering, fabrication, and freight.
             </p>
             <div className="mt-6 flex gap-3">
               <a href="#lead" className="btn-primary">Request a Concept Sketch</a>
@@ -89,9 +103,9 @@ ${data.get('notes') || ''}
             ['Concept & Budget', 'Fast concept sketch and budgetary price.'],
             ['Engineering', 'Connection details and optional PE stamps.'],
             ['Fabrication & Freight', 'Powder-coated steel, hardware, and instructions, shipped.'],
-          ].map(([t,d],i)=>(
+          ].map(([t, d], i) => (
             <div key={i} className="card p-5">
-              <div className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center text-sm font-bold">{i+1}</div>
+              <div className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center text-sm font-bold">{i + 1}</div>
               <div className="mt-3 font-semibold">{t}</div>
               <div className="text-neutral-700">{d}</div>
             </div>
@@ -109,12 +123,50 @@ ${data.get('notes') || ''}
             ['Coatings', 'Hot-dip galvanize, powder coat colors, marine options.'],
             ['Ratings', 'Wind and snow load designs per local requirements.'],
             ['Add-Ons', 'Lighting, electrical standoffs, signage, side panels.'],
-          ].map(([t,d],i)=>(
+          ].map(([t, d], i) => (
             <div key={i} className="card p-5">
               <div className="font-semibold">{t}</div>
               <div className="text-neutral-700">{d}</div>
             </div>
           ))}
+        </div>
+      </Section>
+
+      {/* BUDGET RANGES */}
+      <Section title="Budgetary Ranges" className="py-6">
+        <div className="card overflow-hidden">
+          <div className="p-5">
+            <div className="text-sm text-neutral-600 mb-3">
+              Transparent starting ranges help planning. Exact pricing depends on options, finish, engineering, and freight.
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-neutral-500">
+                    <th className="py-2 pr-4">Footprint</th>
+                    <th className="py-2 pr-4">Starting Range</th>
+                    <th className="py-2">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {budget.map((row, i) => (
+                    <tr key={i} className="border-t border-neutral-200">
+                      <td className="py-2 pr-4 font-medium">{row.size}</td>
+                      <td className="py-2 pr-4">{row.range}</td>
+                      <td className="py-2">{row.notes}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-neutral-200">
+                    <td className="py-2 pr-4 font-medium">Common adders</td>
+                    <td className="py-2 pr-4" colSpan={2}>
+                      {adders.join(', ')}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="text-xs text-neutral-500 mt-2">Taxes and freight calculated at quote.</div>
+          </div>
         </div>
       </Section>
 
@@ -124,8 +176,8 @@ ${data.get('notes') || ''}
           {[
             ['Restaurant Patio, NV', 'Needed shade without columns in walkway.', 'Mono-slope, 20 ft span, slab anchors; installed in one day.'],
             ['Municipal Park, UT', 'Snow load and vandal-resistant finish.', 'Gable roof, 12 ft clearance, HDG + powder; stamped drawings.'],
-            ['Pool Deck, AZ', 'Heat reduction with airflow.', 'Flat roof with slatted panels; ~15°F felt reduction under shade.'],
-          ].map(([title,problem,solution],i)=>(
+            ['Pool Deck, AZ', 'Heat reduction with airflow.', 'Flat roof with slatted panels; noticeable comfort improvement.'],
+          ].map(([title, problem, solution], i) => (
             <div key={i} className="card p-5">
               <div className="font-semibold">{title}</div>
               <div className="text-sm text-neutral-600 mt-1">Problem: {problem}</div>
@@ -140,10 +192,10 @@ ${data.get('notes') || ''}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
             ['Do I need a permit?', 'Many jurisdictions require one. We can provide drawings and, where required, PE stamps.'],
-            ['How long does it take?', 'Typical lead time is 3–4 weeks after approvals; custom complexity can add time.'],
+            ['How long does it take?', 'Typical lead time is 3–4 weeks after approvals; complexity can add time.'],
             ['Who installs?', 'DIY or local contractor. Our kits are bolt-together with illustrated instructions.'],
             ['What is included?', 'Pre-cut steel, hardware, anchors as specified, finish schedule, and install guide.'],
-          ].map(([q,a],i)=>(
+          ].map(([q, a], i) => (
             <div key={i} className="card p-5">
               <div className="font-semibold">{q}</div>
               <div className="text-neutral-700">{a}</div>
@@ -170,11 +222,13 @@ ${data.get('notes') || ''}
               <input className="input" name="budget" placeholder="Budget Range" />
               <textarea className="input sm:col-span-2" name="notes" placeholder="Notes (constraints, photos, links)"></textarea>
 
-              {/* Placeholder for files: works visually; we prompt to email files after */}
+              {/* Visual file input (mailto cannot attach; we prompt user to email files after submit) */}
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Files (drawings/photos)</label>
                 <input className="input w-full" type="file" multiple />
-                <div className="text-xs text-neutral-500 mt-1">Attach files here, then after submit please reply to the email with the files attached so we receive them.</div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  After you hit Submit, please attach files in your email reply so we receive drawings/photos.
+                </div>
               </div>
 
               <div className="sm:col-span-2 flex gap-3 mt-2">
@@ -183,8 +237,9 @@ ${data.get('notes') || ''}
               </div>
             </form>
           </div>
+
           <div className="card p-6">
-            <div className="font-semibold">What you’ll get</div>
+            <div className="font-semibold">What you will get</div>
             <ul className="mt-2 text-neutral-700 text-sm list-disc pl-5 space-y-1">
               <li>Concept sketch and budgetary price</li>
               <li>Option for PE-stamped drawings</li>
