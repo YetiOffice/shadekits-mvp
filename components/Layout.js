@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Head from 'next/head';
+import useScrollHeader from '../hooks/useScrollHeader';
 
-export default function Layout({ children, title = 'ShadeKits', description = 'Commercial-grade steel shade structures — DIY-friendly bolt-together kits. Live configurator, instant budget, PE-stamped drawings available, ships nationwide.' }) {
+export default function Layout({
+  children,
+  title = 'ShadeKits',
+  description = 'Commercial-grade steel shade structures — DIY-friendly bolt-together kits. Live configurator, instant budget, PE-stamped drawings available, ships nationwide.'
+}) {
   const [open, setOpen] = useState(false);
+  const scrolled = useScrollHeader(8);
 
   return (
     <>
@@ -14,7 +20,12 @@ export default function Layout({ children, title = 'ShadeKits', description = 'C
       </Head>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/80 backdrop-blur">
+      <header
+        className={[
+          "sticky top-0 z-40 border-b transition-all",
+          scrolled ? "border-neutral-200/70 bg-white/85 backdrop-blur shadow-sm" : "border-transparent bg-white/70 backdrop-blur"
+        ].join(" ")}
+      >
         <div className="container-7xl flex items-center justify-between py-3 px-4 md:px-6">
           {/* Brand */}
           <div className="flex items-center gap-3">
