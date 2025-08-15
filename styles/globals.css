@@ -2,22 +2,52 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Typography + base */
-:root { --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; }
+/* =========================
+   Base typography & resets
+   ========================= */
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+
+  /* Typographic polish */
+  font-synthesis-weight: none;
+  font-synthesis-style: none;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  font-feature-settings: "liga","kern","calt","ss01","ss02";
+  font-optical-sizing: auto;
+}
+
 html { font-family: var(--font-sans); }
-body { @apply bg-neutral-50 text-neutral-900 antialiased; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  @apply bg-neutral-50 text-neutral-900 antialiased;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 a { @apply transition-colors; }
 
-/* Reusable UI */
+h1, h2, h3 { letter-spacing: -0.01em; }
+
+/* =========================
+   Reusable UI (Tailwind layer)
+   ========================= */
 @layer components {
   .container-7xl { @apply mx-auto max-w-7xl px-4; }
 
   /* Buttons */
-  .btn-primary { @apply inline-flex items-center justify-center rounded-2xl px-4 py-2 bg-red-600 text-white hover:bg-red-700 text-sm shadow-sm; }
-  .btn-secondary { @apply inline-flex items-center justify-center rounded-2xl px-4 py-2 border border-neutral-300 bg-white hover:bg-neutral-50 text-sm; }
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-2xl px-4 py-2
+           bg-red-600 text-white hover:bg-red-700 text-sm shadow-sm;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-2xl px-4 py-2
+           border border-neutral-300 bg-white hover:bg-neutral-50 text-sm;
+  }
 
   /* Inputs, cards, badges */
-  .input { @apply rounded-xl border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-600; }
+  .input {
+    @apply rounded-xl border border-neutral-300 px-3 py-2
+           focus:outline-none focus:ring-2 focus:ring-red-600;
+  }
   .card { @apply rounded-3xl bg-white border border-neutral-200 shadow-sm; }
   .badge { @apply inline-flex items-center rounded-full bg-red-100 text-red-700 text-xs px-2.5 py-1 font-medium; }
 
@@ -25,7 +55,9 @@ a { @apply transition-colors; }
   .section-title { @apply text-xl font-semibold mb-4; }
 }
 
-/* ---------- Apple-style subtle reveal ---------- */
+/* =========================
+   Reveal animations (Apple-style subtle)
+   ========================= */
 .reveal {
   opacity: 0;
   transform: translate3d(0, var(--reveal-y, 18px), 0) scale(var(--reveal-scale, 1));
@@ -36,9 +68,9 @@ a { @apply transition-colors; }
     filter 700ms cubic-bezier(.2,.65,.3,1);
   will-change: opacity, transform, filter;
 }
-.reveal[data-variant="up"]     { --reveal-y: 18px; --reveal-scale: 1; }
-.reveal[data-variant="fade"]   { --reveal-y: 0px;  --reveal-scale: 1; }
-.reveal[data-variant="scale"]  { --reveal-y: 8px;  --reveal-scale: .98; }
+.reveal[data-variant="up"]    { --reveal-y: 18px; --reveal-scale: 1; }
+.reveal[data-variant="fade"]  { --reveal-y: 0px;  --reveal-scale: 1; }
+.reveal[data-variant="scale"] { --reveal-y: 8px;  --reveal-scale: .98; }
 .reveal.in { opacity: 1; transform: none; filter: none; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -50,10 +82,15 @@ a { @apply transition-colors; }
   }
 }
 
-/* Tiny motion polish */
+/* =========================
+   Motion/perf polish
+   ========================= */
 img, video, .card { backface-visibility: hidden; transform: translateZ(0); }
 
-/* ======= Smooth, performant sticky header (glass + gradient underline) ======= */
+/* =========================
+   Smooth, glassy sticky header
+   (gradient underline instead of box-shadow)
+   ========================= */
 .header-glass {
   position: sticky;
   top: 0;
@@ -87,5 +124,3 @@ img, video, .card { backface-visibility: hidden; transform: translateZ(0); }
     transition: none !important;
   }
 }
-/* Keep sticky UI crisp on mobile GPUs */
-.header-glass, .card { transform: translateZ(0); }
