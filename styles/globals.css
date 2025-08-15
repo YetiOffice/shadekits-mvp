@@ -56,3 +56,5 @@ a { @apply transition-colors; }
     filter: none !important;
   }
 }
+/* Tiny motion polish */
+img, video, .card { backface-visibility: hidden; transform: translateZ(0); }
