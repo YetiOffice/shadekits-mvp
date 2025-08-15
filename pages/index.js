@@ -8,6 +8,8 @@ import StickyCTA from "../components/StickyCTA";
 import useParallax from "../hooks/useParallax";
 import MiniHero from "../components/MiniHero";
 import { BLUR_1x1 } from "../lib/blur";
+import HeroMedia from "../components/HeroMedia";
+import { CATALOG } from "../data/products";
 
 // External placeholders (swap later with your real URLs or /public/*)
 const IMG = {
@@ -25,16 +27,48 @@ const IMG = {
     "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1600&q=80",
 };
 
+// Optional hero video placeholder (royalty-free demo)
+// Replace with your own CDN/asset when ready.
+const VID = {
+  hero:
+    "https://videos.pexels.com/video-files/2098988/2098988-uhd_2560_1440_24fps.mp4",
+};
+
 export default function Home() {
-  // Parallax: image moves a touch; text moves even less
-  const heroImg = useParallax(-0.12);
+  // Parallax: media moves a touch; text moves even less
+  const heroMedia = useParallax(-0.12);
   const heroText = useParallax(-0.06);
+
+  // Build JSON-LD for the first three catalog items
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://shadekits-mvp.vercel.app";
+  const topThree = CATALOG.slice(0, 3);
+  const productsJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: topThree.map((p, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      item: {
+        "@type": "Product",
+        name: p.name,
+        url: `${SITE_URL}/product/${p.id}`,
+        brand: { "@type": "Brand", name: "ShadeKits" },
+        offers: {
+          "@type": "Offer",
+          priceCurrency: "USD",
+          price: String(p.basePrice),
+          availability: "https://schema.org/InStock",
+          url: `${SITE_URL}/product/${p.id}`,
+        },
+      },
+    })),
+  };
 
   return (
     <Layout>
       <Head>
         <meta name="robots" content="index,follow" />
-        {/* Preload hero for LCP (cross-origin) */}
+        {/* Preload hero video poster (image) and allow early video fetch */}
         <link
           rel="preload"
           as="image"
@@ -42,6 +76,13 @@ export default function Home() {
           crossOrigin="anonymous"
           imagesrcset={`${IMG.hero} 2400w`}
           imagesizes="100vw"
+        />
+        <link rel="preload" as="video" href={VID.hero} crossOrigin="anonymous" />
+        {/* JSON-LD for products */}
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(productsJsonLd) }}
         />
       </Head>
 
@@ -62,17 +103,15 @@ export default function Home() {
           h-[90vh] min-h-[560px] overflow-hidden bg-black text-white
         "
       >
-        <Image
-          src={IMG.hero}
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          placeholder="blur"
-          blurDataURL={BLUR_1x1}
-          className="object-cover"
-          style={heroImg.style}
-        />
+        <div style={heroMedia.style}>
+          <HeroMedia
+            imageSrc={IMG.hero}
+            videoSrc={VID.hero}
+            alt="ShadeKits — premium steel shade structures"
+            priority
+            blurDataURL={BLUR_1x1}
+          />
+        </div>
         <div className="absolute inset-0 bg-black/45" />
         <div
           className="relative z-10 h-full max-w-6xl mx-auto px-6 flex flex-col items-center justify-center text-center"
