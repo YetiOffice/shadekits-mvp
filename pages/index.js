@@ -6,6 +6,8 @@ import Section from "../components/Section";
 import Reveal from "../components/Reveal";
 import StickyCTA from "../components/StickyCTA";
 import useParallax from "../hooks/useParallax";
+import MiniHero from "../components/MiniHero";
+import { BLUR_1x1 } from "../lib/blur";
 
 // External placeholders (swap later with your real URLs or /public/*)
 const IMG = {
@@ -32,10 +34,26 @@ export default function Home() {
     <Layout>
       <Head>
         <meta name="robots" content="index,follow" />
+        {/* Preload hero for LCP (cross-origin) */}
+        <link
+          rel="preload"
+          as="image"
+          href={IMG.hero}
+          crossOrigin="anonymous"
+          imagesrcset={`${IMG.hero} 2400w`}
+          imagesizes="100vw"
+        />
       </Head>
 
-      {/* Sticky FAB CTA */}
+      {/* Floating helper CTAs */}
       <StickyCTA threshold={520} />
+      <MiniHero
+        title="Design your kit in minutes"
+        subtitle="Instant budget + lead time. Ships nationwide."
+        ctaHref="/builder"
+        ctaLabel="Start Building"
+        image={IMG.flagship}
+      />
 
       {/* HERO */}
       <section
@@ -44,9 +62,22 @@ export default function Home() {
           h-[90vh] min-h-[560px] overflow-hidden bg-black text-white
         "
       >
-        <Image src={IMG.hero} alt="" fill priority sizes="100vw" className="object-cover" style={heroImg.style} />
+        <Image
+          src={IMG.hero}
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          placeholder="blur"
+          blurDataURL={BLUR_1x1}
+          className="object-cover"
+          style={heroImg.style}
+        />
         <div className="absolute inset-0 bg-black/45" />
-        <div className="relative z-10 h-full max-w-6xl mx-auto px-6 flex flex-col items-center justify-center text-center" style={heroText.style}>
+        <div
+          className="relative z-10 h-full max-w-6xl mx-auto px-6 flex flex-col items-center justify-center text-center"
+          style={heroText.style}
+        >
           <Reveal variant="fade">
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight">
               Commercial-Grade Shade Kits
@@ -99,6 +130,8 @@ export default function Home() {
                 alt="Patio Pro 10×10 — flagship kit"
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
+                placeholder="blur"
+                blurDataURL={BLUR_1x1}
                 className="object-cover"
               />
             </div>
@@ -113,7 +146,15 @@ export default function Home() {
           h-[60vh] min-h-[420px] overflow-hidden my-6
         "
       >
-        <Image src={IMG.lifestyle} alt="" fill sizes="100vw" className="object-cover" />
+        <Image
+          src={IMG.lifestyle}
+          alt=""
+          fill
+          sizes="100vw"
+          placeholder="blur"
+          blurDataURL={BLUR_1x1}
+          className="object-cover"
+        />
         <div className="absolute inset-0 bg-black/35" />
         <div className="relative z-10 h-full max-w-6xl mx-auto px-6 flex items-center">
           <Reveal variant="fade">
@@ -164,6 +205,8 @@ export default function Home() {
                     alt={p.name}
                     fill
                     sizes="(max-width:1024px) 100vw, 33vw"
+                    placeholder="blur"
+                    blurDataURL={BLUR_1x1}
                     className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                   />
                 </div>
