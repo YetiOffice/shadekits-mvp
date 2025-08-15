@@ -24,7 +24,7 @@ export default function useScrollHeader(threshold = 8) {
       }
     };
 
-    // run once to initialize
+    // initialize once
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
