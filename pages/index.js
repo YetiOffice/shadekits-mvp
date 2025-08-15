@@ -4,6 +4,8 @@ import Head from "next/head";
 import Layout from "../components/Layout";
 import Section from "../components/Section";
 import Reveal from "../components/Reveal";
+import StickyCTA from "../components/StickyCTA";
+import useParallax from "../hooks/useParallax";
 
 // External placeholders (swap later with your real URLs or /public/*)
 const IMG = {
@@ -22,12 +24,18 @@ const IMG = {
 };
 
 export default function Home() {
+  // Parallax: image moves a touch; text moves even less
+  const heroImg = useParallax(-0.12);
+  const heroText = useParallax(-0.06);
+
   return (
     <Layout>
       <Head>
-        {/* Page-specific overrides are optional; defaults exist in _app.js */}
         <meta name="robots" content="index,follow" />
       </Head>
+
+      {/* Sticky FAB CTA */}
+      <StickyCTA threshold={520} />
 
       {/* HERO */}
       <section
@@ -36,9 +44,9 @@ export default function Home() {
           h-[90vh] min-h-[560px] overflow-hidden bg-black text-white
         "
       >
-        <Image src={IMG.hero} alt="" fill priority sizes="100vw" className="object-cover" />
+        <Image src={IMG.hero} alt="" fill priority sizes="100vw" className="object-cover" style={heroImg.style} />
         <div className="absolute inset-0 bg-black/45" />
-        <div className="relative z-10 h-full max-w-6xl mx-auto px-6 flex flex-col items-center justify-center text-center">
+        <div className="relative z-10 h-full max-w-6xl mx-auto px-6 flex flex-col items-center justify-center text-center" style={heroText.style}>
           <Reveal variant="fade">
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight">
               Commercial-Grade Shade Kits
