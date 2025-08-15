@@ -5,15 +5,10 @@ const BLUR_1x1 =
   "data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=";
 
 const IMG = {
-  hero: "/hero.jpg",
+  hero: "/hero.jpg",        // you already uploaded this
   product1: "/product1.jpg",
   product2: "/product2.jpg",
   product3: "/product3.jpg",
-};
-
-// Known-good public test video (replace with your own later)
-const VID = {
-  hero: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
 };
 
 export default function Home() {
@@ -22,15 +17,18 @@ export default function Home() {
       {/* HERO */}
       <section className="container-7xl pt-6">
         <div className="relative h-[70vh] md:h-[80vh] rounded-3xl overflow-hidden">
-          {/* Media: image baseline + video fades in when ready */}
+          {/* Media (image fallback forced) */}
           <HeroMedia
             imageSrc={IMG.hero}
-            videoSrc={VID.hero} // ← video ON (layout unchanged)
+            videoSrc={undefined} // ← image-only (keeps layout exactly as before)
             alt="ShadeKits — premium steel shade structures"
             priority
             blurDataURL={BLUR_1x1}
           />
+          {/* Dark overlay (subtle so image is clear) */}
           <div className="absolute inset-0 bg-black/25" />
+
+          {/* Text content */}
           <div className="relative z-10 h-full flex flex-col items-center justify-center text-center text-white px-6">
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
               Commercial-Grade Shade Kits
@@ -46,7 +44,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Popular kits (placeholder) */}
+      {/* Popular kits (placeholder content you can replace anytime) */}
       <section className="container-7xl py-12">
         <h2 className="section-title">Popular Kits</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
