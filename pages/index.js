@@ -1,20 +1,19 @@
-const VID = {
-  hero: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-};
-
 import Layout from "../components/Layout";
 import HeroMedia from "../components/HeroMedia";
-// (Optional) If you’re using Reveal elsewhere, keep it imported. We won’t use it here.
-// import Reveal from "../components/Reveal";
 
 const BLUR_1x1 =
   "data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=";
 
 const IMG = {
-  hero: "/hero.jpg",        // you already uploaded this
+  hero: "/hero.jpg",        // your uploaded hero image
   product1: "/product1.jpg",
   product2: "/product2.jpg",
   product3: "/product3.jpg",
+};
+
+// ✅ Known-good public test video
+const VID = {
+  hero: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
 };
 
 export default function Home() {
@@ -23,15 +22,15 @@ export default function Home() {
       {/* HERO */}
       <section className="container-7xl pt-6">
         <div className="relative h-[70vh] md:h-[80vh] rounded-3xl overflow-hidden">
-          {/* Media (image fallback forced) */}
+          {/* Media: image layer + video on top (fades in when ready) */}
           <HeroMedia
             imageSrc={IMG.hero}
-            videoSrc={undefined} // 👈 force IMAGE for now (no video)
+            videoSrc={VID.hero} // 👈 enable test video here
             alt="ShadeKits — premium steel shade structures"
             priority
             blurDataURL={BLUR_1x1}
           />
-          {/* Dark overlay (lighter so image is clear) */}
+          {/* Dark overlay (kept subtle so video shows through) */}
           <div className="absolute inset-0 bg-black/25" />
 
           {/* Text content */}
@@ -50,7 +49,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Placeholder: Popular kits section — keep or replace later */}
+      {/* Popular kits (placeholder content) */}
       <section className="container-7xl py-12">
         <h2 className="section-title">Popular Kits</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
