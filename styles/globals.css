@@ -36,18 +36,11 @@ a { @apply transition-colors; }
     filter 700ms cubic-bezier(.2,.65,.3,1);
   will-change: opacity, transform, filter;
 }
-
 .reveal[data-variant="up"]     { --reveal-y: 18px; --reveal-scale: 1; }
 .reveal[data-variant="fade"]   { --reveal-y: 0px;  --reveal-scale: 1; }
 .reveal[data-variant="scale"]  { --reveal-y: 8px;  --reveal-scale: .98; }
+.reveal.in { opacity: 1; transform: none; filter: none; }
 
-.reveal.in {
-  opacity: 1;
-  transform: none;
-  filter: none;
-}
-
-/* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .reveal, .reveal.in {
     transition: none !important;
@@ -56,5 +49,41 @@ a { @apply transition-colors; }
     filter: none !important;
   }
 }
+
 /* Tiny motion polish */
 img, video, .card { backface-visibility: hidden; transform: translateZ(0); }
+
+/* ======= Smooth, performant sticky header (glass + gradient underline) ======= */
+.header-glass {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255,255,255,0.70);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  transform: translateZ(0);
+  will-change: background-color;
+}
+.header-glass::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 12px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.10), rgba(0,0,0,0));
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+.header-glass.is-scrolled {
+  background: rgba(255,255,255,0.85);
+  border-bottom-color: rgba(0,0,0,0.06);
+}
+.header-glass.is-scrolled::after { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .header-glass,
+  .header-glass::after {
+    transition: none !important;
+  }
+}
