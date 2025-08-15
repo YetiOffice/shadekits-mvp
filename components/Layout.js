@@ -22,8 +22,8 @@ export default function Layout({
       {/* Header */}
       <header
         className={[
-          "sticky top-0 z-40 border-b transition-all",
-          scrolled ? "border-neutral-200/70 bg-white/85 backdrop-blur shadow-sm" : "border-transparent bg-white/70 backdrop-blur"
+          "header-glass",
+          scrolled ? "is-scrolled" : ""
         ].join(" ")}
       >
         <div className="container-7xl flex items-center justify-between py-3 px-4 md:px-6">
