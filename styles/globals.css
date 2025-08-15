@@ -87,3 +87,5 @@ img, video, .card { backface-visibility: hidden; transform: translateZ(0); }
     transition: none !important;
   }
 }
+/* Keep sticky UI crisp on mobile GPUs */
+.header-glass, .card { transform: translateZ(0); }
