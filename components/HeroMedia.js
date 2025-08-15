@@ -42,8 +42,6 @@ export default function HeroMedia({
 
     const onCanPlay = async () => {
       try {
-        // Some browsers need a tiny kick to start decoding before play()
-        // Also ensure muted + playsInline for autoplay policies
         v.muted = true;
         v.playsInline = true;
 
@@ -54,7 +52,6 @@ export default function HeroMedia({
         if (!canceled) setVideoReady(true);
       } catch {
         if (!canceled) {
-          // Fallback: keep image only
           setShouldTryVideo(false);
           setVideoReady(false);
         }
@@ -101,7 +98,7 @@ export default function HeroMedia({
         className="object-cover"
       />
 
-      {/* Video layer (only drawn if we’re trying video) */}
+      {/* Video layer (drawn if we’re trying video) */}
       {shouldTryVideo && (
         <video
           ref={vidRef}
