@@ -1,285 +1,173 @@
-// components/Builder/Viewer3D.js
-import React, { Suspense, useMemo, useRef, useEffect, useState, useCallback } from "react";
+import React, { Suspense, useMemo, useRef, useEffect, useCallback, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Environment } from "@react-three/drei";
+import SentryBoundary from "../SentryBoundary";
+import DimensionLines from "./DimensionLines";
+import MaterialPreview from "./MaterialPreview";
+import TooltipOverlay from "./TooltipOverlay";
+import SnapshotButton from "./SnapshotButton";
 
-/**
- * Assumptions:
- * - Units are feet.
- * - config = { span, depth, height, style, infill, finish }
- *   style: 'FreestandingMono' | 'AttachedMono' | 'FreestandingGable' (we render Mono & Gable here)
- *   infill: 'none' | 'open' | 'medium' | 'tight'
- *   finish: 'black' | 'white' | 'bronze' | 'hdg'
- *
- * This file restores the solid-mesh pergola you had earlier and adds a safe camera-fit
- * without changing geometry/materials.
- */
-
-// 4x4 post size in feet (≈ 3.5")
-const POST = 0.333;               // ~4"
-const BEAM = 0.333;               // ~4" beam thickness
-const SLAT_THICK = 0.15;          // ~1.8" slat thickness
-const SLAT_HEIGHT = 0.12;         // ~1.4" slat height above beam
+// Model constants
+const POST = 0.333; // 4"
+const BEAM = 0.333;
+const SLAT_THICK = 0.15;
+const SLAT_HEIGHT = 0.12;
 
 function finishToColor(finish) {
   switch ((finish || "").toLowerCase()) {
-    case "white":
-      return "#f8f8f8";
-    case "bronze":
-      return "#3b2a20";
-    case "hdg":
-      return "#9aa0a6";
-    default:
-    case "black":
-      return "#17181a";
+    case "white": return "#f8f8f8";
+    case "bronze": return "#3b2a20";
+    case "hdg":    return "#9aa0a6";
+    default:       return "#17181a";
   }
 }
-
 function spacingFeet(infill) {
   switch ((infill || "").toLowerCase()) {
-    case "open":
-      return 1.0;   // 12"
-    case "medium":
-      return 0.5;   // 6"
-    case "tight":
-      return 0.33;  // 4"
-    default:
-      return 0;     // none
+    case "open":   return 1.0;
+    case "medium": return 0.5;
+    case "tight":  return 0.33;
+    default:       return 0;
   }
 }
 
-/** Build the pergola geometry as meshes */
-function Pergola({ config }) {
-  const group = useRef();
-
-  const { nodes } = useMemo(() => {
-    const nodes = [];
-    const span = Math.max(4, Number(config.span || 12));
-    const depth = Math.max(4, Number(config.depth || 12));
-    const height = Math.max(7, Number(config.height || 10));
-    const color = new THREE.Color(finishToColor(config.finish));
-    const metalness = config.finish?.toLowerCase() === "hdg" ? 0.0 : 0.3;
-    const roughness = config.finish?.toLowerCase() === "hdg" ? 0.7 : 0.45;
-
-    const mat = new THREE.MeshStandardMaterial({
-      color,
-      metalness,
-      roughness,
-    });
-
-    // Posts (4 corners for freestanding)
-    const postGeo = new THREE.BoxGeometry(POST, height, POST);
-    const yPost = height / 2;
-
-    const addMesh = (geo, x, y, z, rotY = 0, material = mat) => {
-      const m = new THREE.Mesh(geo, material);
-      m.position.set(x, y, z);
-      if (rotY) m.rotation.y = rotY;
-      m.castShadow = m.receiveShadow = true;
-      nodes.push(m);
-    };
-
-    const isAttached = (config.style || "").toLowerCase().includes("attached");
-
-    // Corners (0,0) to (span, depth)
-    // Attached: two posts on front only
-    if (isAttached) {
-      addMesh(postGeo, span - POST / 2, yPost, POST / 2);
-      addMesh(postGeo, POST / 2, yPost, POST / 2);
-    } else {
-      addMesh(postGeo, POST / 2, yPost, POST / 2);
-      addMesh(postGeo, span - POST / 2, yPost, POST / 2);
-      addMesh(postGeo, POST / 2, yPost, depth - POST / 2);
-      addMesh(postGeo, span - POST / 2, yPost, depth - POST / 2);
-    }
-
-    // Top perimeter beams (front/back + left/right)
-    const beamXGeo = new THREE.BoxGeometry(span, BEAM, BEAM);   // along X
-    const beamZGeo = new THREE.BoxGeometry(BEAM, BEAM, depth);  // along Z
-    const yBeam = height + BEAM / 2;
-
-    // Front beam (z = POST/2)
-    addMesh(beamXGeo, span / 2, yBeam, POST / 2);
-    // Back beam (z = depth - POST/2) (only if freestanding)
-    if (!isAttached) addMesh(beamXGeo, span / 2, yBeam, depth - POST / 2);
-
-    // Left beam (x = POST/2)
-    addMesh(beamZGeo, POST / 2, yBeam, depth / 2);
-    // Right beam (x = span - POST/2)
-    addMesh(beamZGeo, span - POST / 2, yBeam, depth / 2);
-
-    // Gable center beam (optional simple representation)
-    if ((config.style || "").toLowerCase().includes("gable")) {
-      const ridgeGeo = new THREE.BoxGeometry(span, BEAM, BEAM);
-      addMesh(ridgeGeo, span / 2, yBeam + BEAM, depth / 2);
-    }
-
-    // Slats (if any) run parallel to front beam (across X, spaced along Z)
-    const gap = spacingFeet(config.infill);
-    if (gap > 0) {
-      const slatGeo = new THREE.BoxGeometry(span - POST, SLAT_HEIGHT, SLAT_THICK);
-      const zStart = POST + gap / 2;
-      for (let z = zStart; z <= depth - POST; z += gap) {
-        addMesh(slatGeo, span / 2, yBeam + SLAT_HEIGHT / 2, z);
-      }
-    }
-
-    return { nodes };
-  }, [config]);
-
-  return <group ref={group} dispose={null}>{nodes.map((n, i) => <primitive key={i} object={n} />)}</group>;
-}
-
-/** Safe camera fit that never changes geometry/materials */
-function useFitCamera(groupRef, deps = []) {
-  const { camera, controls, size } = useThree();
-
-  const fit = useCallback(() => {
-    const g = groupRef.current;
-    if (!g) return;
-
-    const box = new THREE.Box3().setFromObject(g);
-    const sizeV = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(sizeV);
-    box.getCenter(center);
-
-    // set controls target to center
-    if (controls) {
-      controls.target.copy(center);
-      controls.update();
-    }
-
-    // Compute distance for current fov & canvas height
-    const margin = 1.25; // zoom out a bit
-    const maxSize = Math.max(sizeV.x, sizeV.y, sizeV.z);
-    const fov = (camera.fov || 50) * (Math.PI / 180);
-    const dist = (maxSize * margin) / (2 * Math.tan(fov / 2));
-
-    // place camera along diagonal
-    camera.position.set(center.x + dist, center.y + dist * 0.6, center.z + dist);
-    camera.near = Math.max(0.1, dist / 50);
-    camera.far = dist * 200;
-    camera.updateProjectionMatrix();
-
-    if (controls) controls.update();
-  }, [camera, controls, size]);
-
-  useEffect(() => { fit(); }, [fit, ...deps]);
-  return fit;
-}
-
-/** Internal overlay buttons (Front / Corner / Top / Reset) */
-function ViewButtons({ onFront, onCorner, onTop, onReset }) {
+// Error boundary for geometry
+function GeometryBoundary({ children }) {
+  const [error, setError] = useState(null);
+  if (error) {
+    return <div role="alert" aria-live="assertive" style={{ color: "#b91c1c", padding: 18, background: "#fff4f4", borderRadius: 12 }}>
+      <div><b>3D Model Error</b></div>
+      <div>{error.message}</div>
+    </div>;
+  }
   return (
-    <div
-      style={{
-        position: "absolute",
-        bottom: 8,
-        left: 8,
-        display: "flex",
-        gap: 8,
-        zIndex: 2,
-      }}
-    >
-      <button onClick={onFront} className="btn btn-sm">Front</button>
-      <button onClick={onCorner} className="btn btn-sm">Corner</button>
-      <button onClick={onTop} className="btn btn-sm">Top</button>
-      <button onClick={onReset} className="btn btn-sm">Reset</button>
-    </div>
+    <React.Suspense fallback={null}>
+      {React.cloneElement(children, { onError: setError })}
+    </React.Suspense>
   );
 }
 
-/** Snapshot helper (if you want a local button) */
-function useSnapshot() {
-  const { gl } = useThree();
-  return useCallback(() => {
-    try {
-      const url = gl.domElement.toDataURL("image/png");
-      return url;
-    } catch {
-      return null;
-    }
-  }, [gl]);
+// Modular pergola
+function Pergola({ config, onError, onHover }) {
+  const group = useRef();
+  try {
+    const { nodes, dimensions } = useMemo(() => {
+      const nodes = [];
+      const span = Math.max(4, Number(config.span || 12));
+      const depth = Math.max(4, Number(config.depth || 12));
+      const height = Math.max(7, Number(config.height || 10));
+      const color = new THREE.Color(finishToColor(config.finish));
+      const metalness = config.finish?.toLowerCase() === "hdg" ? 0.0 : 0.3;
+      const roughness = config.finish?.toLowerCase() === "hdg" ? 0.7 : 0.45;
+      const mat = new THREE.MeshStandardMaterial({ color, metalness, roughness });
+
+      const postGeo = new THREE.BoxGeometry(POST, height, POST);
+      const yPost = height / 2;
+      const addMesh = (geo, x, y, z, rotY = 0, material = mat, tooltip = null) => {
+        const m = new THREE.Mesh(geo, material);
+        m.position.set(x, y, z);
+        if (rotY) m.rotation.y = rotY;
+        m.castShadow = m.receiveShadow = true;
+        if (tooltip) m.userData.tooltip = tooltip;
+        m.userData.type = tooltip ? tooltip : "structure";
+        nodes.push(m);
+      };
+      const isAttached = (config.style || "").toLowerCase().includes("attached");
+      if (isAttached) {
+        addMesh(postGeo, span - POST / 2, yPost, POST / 2, 0, mat, "Post (Attached)");
+        addMesh(postGeo, POST / 2, yPost, POST / 2, 0, mat, "Post (Attached)");
+      } else {
+        addMesh(postGeo, POST / 2, yPost, POST / 2, 0, mat, "Post (Corner)");
+        addMesh(postGeo, span - POST / 2, yPost, POST / 2, 0, mat, "Post (Corner)");
+        addMesh(postGeo, POST / 2, yPost, depth - POST / 2, 0, mat, "Post (Corner)");
+        addMesh(postGeo, span - POST / 2, yPost, depth - POST / 2, 0, mat, "Post (Corner)");
+      }
+      const beamXGeo = new THREE.BoxGeometry(span, BEAM, BEAM);
+      const beamZGeo = new THREE.BoxGeometry(BEAM, BEAM, depth);
+      const yBeam = height + BEAM / 2;
+      addMesh(beamXGeo, span / 2, yBeam, POST / 2, 0, mat, "Front Beam");
+      if (!isAttached) addMesh(beamXGeo, span / 2, yBeam, depth - POST / 2, 0, mat, "Back Beam");
+      addMesh(beamZGeo, POST / 2, yBeam, depth / 2, 0, mat, "Left Beam");
+      addMesh(beamZGeo, span - POST / 2, yBeam, depth / 2, 0, mat, "Right Beam");
+      if ((config.style || "").toLowerCase().includes("gable")) {
+        const ridgeGeo = new THREE.BoxGeometry(span, BEAM, BEAM);
+        addMesh(ridgeGeo, span / 2, yBeam + BEAM, depth / 2, 0, mat, "Gable Ridge");
+      }
+      const gap = spacingFeet(config.infill);
+      if (gap > 0) {
+        const slatGeo = new THREE.BoxGeometry(span - POST, SLAT_HEIGHT, SLAT_THICK);
+        const zStart = POST + gap / 2;
+        for (let z = zStart; z <= depth - POST; z += gap) {
+          addMesh(slatGeo, span / 2, yBeam + SLAT_HEIGHT / 2, z, 0, mat, "Slat");
+        }
+      }
+      // Dimensions for overlays
+      return { nodes, dimensions: { span, depth, height } };
+    }, [config]);
+    // Hover interaction for tooltips/material preview
+    return <group ref={group} dispose={null}>
+      {nodes.map((n, i) => (
+        <primitive
+          key={i}
+          object={n}
+          onPointerOver={e => onHover && onHover(n)}
+          onPointerOut={e => onHover && onHover(null)}
+        />
+      ))}
+      <DimensionLines {...dimensions} />
+    </group>;
+  } catch (err) {
+    if (onError) onError(err);
+    return null;
+  }
 }
 
-function Scene({ config, onRequestSnapshot }) {
-  const groupRef = useRef();
+// Camera fit logic and presets (returns preset functions)
+function useCameraPresets(groupRef) {
   const { camera, controls } = useThree();
-
-  // Fit camera whenever config changes
-  const fit = useFitCamera(groupRef, [config.span, config.depth, config.height, config.infill, config.style]);
-
-  const goFront = () => {
-    const span = Number(config.span || 12);
-    const depth = Number(config.depth || 12);
-    const height = Number(config.height || 10);
-    const dist = Math.max(span, depth) * 1.2;
-    camera.position.set(span / 2, height * 0.75, depth + dist);
-    controls.target.set(span / 2, height * 0.5, depth / 2);
+  const preset = useCallback((pos, target) => {
+    camera.position.set(...pos);
+    controls.target.set(...target);
     camera.updateProjectionMatrix();
     controls.update();
-  };
+  }, [camera, controls]);
+  return preset;
+}
 
-  const goCorner = () => {
-    const span = Number(config.span || 12);
-    const depth = Number(config.depth || 12);
-    const height = Number(config.height || 10);
-    const dist = Math.max(span, depth) * 1.4;
-    camera.position.set(-dist, height * 0.8, dist);
-    controls.target.set(span / 2, height * 0.5, depth / 2);
-    camera.updateProjectionMatrix();
-    controls.update();
-  };
+// Scene with overlays and error boundaries
+function SceneWithOverlays({ config, onHover }) {
+  const groupRef = useRef();
+  const [error, setError] = useState(null);
 
-  const goTop = () => {
-    const span = Number(config.span || 12);
-    const depth = Number(config.depth || 12);
-    const height = Number(config.height || 10);
-    const dist = Math.max(span, depth) * 2.0;
-    camera.position.set(span / 2, dist, depth / 2);
-    controls.target.set(span / 2, height / 2, depth / 2);
-    camera.updateProjectionMatrix();
-    controls.update();
-  };
-
-  const doReset = () => fit();
-
-  const takeSnapshot = useSnapshot();
-
+  // ARIA for canvas
   useEffect(() => {
-    if (!onRequestSnapshot) return;
-    onRequestSnapshot.current = () => takeSnapshot();
-  }, [onRequestSnapshot, takeSnapshot]);
+    const canvas = document.querySelector("canvas");
+    if (canvas) {
+      canvas.setAttribute("role", "img");
+      canvas.setAttribute("aria-label", "3D pergola preview");
+      canvas.setAttribute("tabIndex", "0");
+    }
+  }, []);
 
-  // Simple daylight
   return (
     <>
       <ambientLight intensity={0.6} />
-      <directionalLight
-        position={[50, 80, 50]}
-        intensity={0.9}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-      />
+      <directionalLight position={[50, 80, 50]} intensity={0.9} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
       <group ref={groupRef}>
-        <Pergola config={config} />
+        <GeometryBoundary>
+          <Pergola config={config} onError={setError} onHover={onHover} />
+        </GeometryBoundary>
         {/* Ground shadow catcher */}
         <mesh position={[ (config.span||12)/2, 0, (config.depth||12)/2 ]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
           <planeGeometry args={[1000, 1000]} />
           <meshStandardMaterial color="#ffffff" roughness={1} metalness={0} />
         </mesh>
       </group>
-
-      <ViewButtons onFront={goFront} onCorner={goCorner} onTop={goTop} onReset={doReset} />
     </>
   );
 }
 
-export default function Viewer3D({ config, onSnapshotRef }) {
-  // Make sure we have stable numeric values
+export default function Viewer3D({ config }) {
   const safeConfig = {
     span: Number(config?.span || 12),
     depth: Number(config?.depth || 12),
@@ -289,25 +177,68 @@ export default function Viewer3D({ config, onSnapshotRef }) {
     infill: config?.infill || "none",
   };
 
-  const snapRef = useRef();
-  useEffect(() => {
-    if (onSnapshotRef) onSnapshotRef.current = () => snapRef.current?.();
-  }, [onSnapshotRef]);
+  const [hovered, setHovered] = useState(null);
+  const canvasRef = useRef(null);
+
+  // Camera preset logic for overlay buttons
+  const cameraPresets = [
+    { label: "Front", pos: [safeConfig.span / 2, safeConfig.height * 0.75, safeConfig.depth + Math.max(safeConfig.span, safeConfig.depth) * 1.2], target: [safeConfig.span / 2, safeConfig.height * 0.5, safeConfig.depth / 2] },
+    { label: "Corner", pos: [-Math.max(safeConfig.span, safeConfig.depth) * 1.4, safeConfig.height * 0.8, Math.max(safeConfig.span, safeConfig.depth) * 1.4], target: [safeConfig.span / 2, safeConfig.height * 0.5, safeConfig.depth / 2] },
+    { label: "Top", pos: [safeConfig.span / 2, Math.max(safeConfig.span, safeConfig.depth) * 2.0, safeConfig.depth / 2], target: [safeConfig.span / 2, safeConfig.height / 2, safeConfig.depth / 2] },
+    { label: "Side", pos: [0, safeConfig.height / 2, safeConfig.depth * 2], target: [safeConfig.span / 2, safeConfig.height / 2, safeConfig.depth / 2] },
+    { label: "Isometric", pos: [safeConfig.span, safeConfig.height, safeConfig.depth], target: [safeConfig.span / 2, safeConfig.height / 2, safeConfig.depth / 2] }
+  ];
+
+  // Overlay buttons outside Canvas
+  function CameraPresetOverlay() {
+    // Use imperative API for camera movement
+    const presetFns = [];
+    cameraPresets.forEach((preset, idx) => {
+      presetFns.push(() => {
+        const canvas = canvasRef.current;
+        if (canvas && canvas.__r3f && canvas.__r3f.root) {
+          const state = canvas.__r3f.root.getState();
+          state.camera.position.set(...preset.pos);
+          state.controls.target.set(...preset.target);
+          state.camera.updateProjectionMatrix();
+          state.controls.update();
+        }
+      });
+    });
+    return (
+      <div aria-label="Camera Presets" style={{
+        position: "absolute", bottom: 8, left: 8, display: "flex", gap: 8, zIndex: 2
+      }}>
+        {cameraPresets.map((preset, i) => (
+          <button type="button" key={preset.label} onClick={presetFns[i]}>{preset.label}</button>
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div style={{ position: "relative", width: "100%", height: 520, borderRadius: 12, overflow: "hidden", background: "#f7f8fa" }}>
-      <Canvas
-        shadows
-        dpr={[1, 2]}
-        camera={{ fov: 45, near: 0.1, far: 5000, position: [safeConfig.span, safeConfig.height, safeConfig.depth * 1.5] }}
-        gl={{ preserveDrawingBuffer: true }}  // enables snapshots
-      >
-        <Suspense fallback={null}>
-          <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
-          <Environment preset="city" />
-          <Scene config={safeConfig} onRequestSnapshot={snapRef} />
-        </Suspense>
-      </Canvas>
-    </div>
+    <SentryBoundary>
+      <div style={{ position: "relative", width: "100%", height: 520, borderRadius: 12, overflow: "hidden", background: "#f7f8fa" }}>
+        {/* Overlay UI OUTSIDE Canvas */}
+        <CameraPresetOverlay />
+        <MaterialPreview hovered={hovered} />
+        <TooltipOverlay hovered={hovered} />
+        <SnapshotButton canvasRef={canvasRef} />
+        {/* 3D Canvas */}
+        <Canvas
+          ref={canvasRef}
+          shadows
+          dpr={[1, 2]}
+          camera={{ fov: 45, near: 0.1, far: 5000, position: [safeConfig.span, safeConfig.height, safeConfig.depth * 1.5] }}
+          gl={{ preserveDrawingBuffer: true }}
+        >
+          <Suspense fallback={null}>
+            <OrbitControls makeDefault enableDamping dampingFactor={0.08} />
+            <Environment preset="city" />
+            <SceneWithOverlays config={safeConfig} onHover={setHovered} />
+          </Suspense>
+        </Canvas>
+      </div>
+    </SentryBoundary>
   );
 }
