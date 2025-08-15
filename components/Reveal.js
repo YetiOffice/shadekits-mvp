@@ -1,5 +1,4 @@
 // components/Reveal.js
-import clsx from "clsx";
 import useReveal from "../hooks/useReveal";
 
 /**
@@ -16,12 +15,16 @@ export default function Reveal({
 }) {
   const { ref, visible } = useReveal();
 
+  const classes = ["reveal", visible ? "in" : "", className]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <Tag
       ref={ref}
       data-variant={variant}
       style={{ transitionDelay: `${Math.max(0, delay)}ms` }}
-      className={clsx("reveal", visible && "in", className)}
+      className={classes}
     >
       {children}
     </Tag>
