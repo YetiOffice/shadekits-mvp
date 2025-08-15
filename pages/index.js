@@ -1,3 +1,7 @@
+const VID = {
+  hero: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+};
+
 import Layout from "../components/Layout";
 import HeroMedia from "../components/HeroMedia";
 // (Optional) If you’re using Reveal elsewhere, keep it imported. We won’t use it here.
