@@ -1,0 +1,6 @@
+﻿node_modules/
+.next/
+out/
+.vscode/
+.env*
+nomadic-ocean-*.json
