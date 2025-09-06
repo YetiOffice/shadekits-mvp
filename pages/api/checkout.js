@@ -26,10 +26,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Unknown kit" });
     }
 
-    if (!isConfigEqual(kit.config, cfg)) {
-      console.log("[checkout] config mismatch");
-      return res.status(400).json({ error: "Configuration is not buy-eligible" });
-    }
+
 
     // Price: use your pricing engine; fallback to 0 if it returns nothing.
     const legacy = {
