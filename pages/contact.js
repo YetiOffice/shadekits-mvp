@@ -102,7 +102,7 @@ export default function ContactPage() {
               <div className="text-sm">
                 <div>Email: <a className="underline" href="mailto:office@yetiwelding.com">office@yetiwelding.com</a></div>
                 <div>Phone: <a className="underline" href="tel:+18109958906">+1 (810) 995-8906</a></div>
-                <div className="mt-1">Ship-From: Placeholder City, UT</div>
+                <div className="mt-1">Ship-From: Springville, UT City, UT</div>
               </div>
             </div>
 
