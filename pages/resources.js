@@ -1,4 +1,3 @@
-// pages/resources.js
 import Link from "next/link";
 import Layout from "../components/Layout";
 import MetaStrip from "../components/MetaStrip";
@@ -7,48 +6,56 @@ import FAQMini from "../components/FAQMini";
 const SPEC_PACK_URL = process.env.NEXT_PUBLIC_SPEC_PACK_URL || "/spec-pack.pdf";
 
 const docs = [
-  { title: "Anchoring Overview", href: "#", note: "PDF" },
-  { title: "Finish & Care", href: "#", note: "PDF" },
-  { title: "Wind / Snow / Permitting Notes", href: "#", note: "PDF" },
-  { title: "Warranty Summary", href: "#", note: "PDF" },
+  { title: "Anchoring Overview", href: SPEC_PACK_URL, note: "PDF" },
+  { title: "Finish & Care", href: SPEC_PACK_URL, note: "PDF" },
+  { title: "Wind / Snow / Permitting Notes", href: SPEC_PACK_URL, note: "PDF" },
+  { title: "Warranty Summary", href: SPEC_PACK_URL, note: "PDF" },
 ];
 
 export default function ResourcesPage() {
   return (
-    <Layout title="Install Resources — ShadeKits">
+    <Layout title="Install Resources \u2014 ShadeKits">
       <MetaStrip />
-
       <div className="container-7xl mb-16">
         <h1 className="mb-6">Install Resources</h1>
 
         {/* Spec Pack hero */}
-        <div className="card p-4 mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div className="card p-4 mb-4 flex flex-col md:flex-row items-center justify-between gap-3">
           <div>
             <div className="font-semibold">Spec Pack (PDF)</div>
             <div className="text-sm text-neutral-700">
               Cut sheet, finishes, anchoring options, install overview, wind/snow guidance, warranty, and contact.
             </div>
           </div>
-          <a className="btn-primary" href={SPEC_PACK_URL} target="_blank" rel="noreferrer">
-            Download Spec Pack
+          <a
+            href={SPEC_PACK_URL}
+            target="_blank"
+            rel="noopener"
+            className="btn btn-primary"
+          >
+            Download PDF
           </a>
         </div>
 
-        {/* Other documents */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {docs.map((d, i) => (
-            <div key={i} className="card p-4">
-              <div className="font-medium">{d.title}</div>
-              <div className="text-sm text-neutral-700 mb-3">{d.note}</div>
-              <a className="btn-ghost" href={d.href}>Download PDF</a>
+        {/* Document list */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {docs.map((doc) => (
+            <div key={doc.title} className="card p-4">
+              <div className="font-semibold">{doc.title}</div>
+              <div className="text-sm text-neutral-600">{doc.note}</div>
+              <a
+                href={doc.href}
+                target="_blank"
+                rel="noopener"
+                className="btn btn-secondary mt-2"
+              >
+                Download PDF
+              </a>
             </div>
           ))}
         </div>
-
-        <div className="mt-6">
-          <FAQMini title="Quick FAQ" />
-        </div>
       </div>
+      <FAQMini />
     </Layout>
   );
 }
