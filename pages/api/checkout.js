@@ -3,6 +3,10 @@ import Stripe from "stripe";
 import { PRICE_MAP } from "../../data/priceMap";
 import { getKitBySlug } from "../../data/standardKits";
 
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("STRIPE_SECRET_KEY is missing in .env.local");
+}
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-06-20",
 });
@@ -19,14 +23,18 @@ export default async function handler(req, res) {
 
   try {
     const { slug, cfg = {} } = req.body || {};
+
     const kit = getKitBySlug?.(slug);
     if (!kit) return res.status(400).json({ error: "Unknown kit" });
 
     const priceId = PRICE_MAP?.[slug];
-    if (!priceId)
-      return res.status(400).json({ error: "No price configured for this kit" });
+    if (!priceId) {
+      return res
+        .status(400)
+        .json({ error: "No price configured for this kit" });
+    }
 
-    // Figure out the base URL for redirecting back to your site
+    // Base URL for redirects
     const origin =
       process.env.NEXT_PUBLIC_SITE_URL ||
       req.headers.origin ||
@@ -45,7 +53,9 @@ export default async function handler(req, res) {
         ...(cfg.depth != null && { depth: String(cfg.depth) }),
         ...(cfg.height != null && { height: String(cfg.height) }),
         ...(cfg.colorId != null && { colorId: String(cfg.colorId) }),
-        ...(cfg.roofDesignId != null && { roofDesignId: String(cfg.roofDesignId) }),
+        ...(cfg.roofDesignId != null && {
+          roofDesignId: String(cfg.roofDesignId),
+        }),
       },
     });
 
