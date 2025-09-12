@@ -2,55 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Base reset & typography */
+/* Base reset */
 html, body { height: 100%; }
 :root {
+  /* Focus ring + optional display font hook (overridden by next/font if you set it) */
   --ring: 180 5% 65%;
+  --font-display: ui-serif, Georgia, "Times New Roman", serif;
 }
 
 @layer base {
-  html { color-scheme: light; }
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   body {
     @apply bg-neutral-50 text-neutral-900 antialiased;
     font-feature-settings: "liga" 1, "calt" 1, "tnum" 1, "cv02" 1, "cv03" 1, "cv04" 1;
   }
-  /* Heading scale (clean & consistent) */
-  h1 { @apply text-4xl md:text-5xl font-semibold tracking-tight; }
-  h2 { @apply text-2xl md:text-3xl font-semibold tracking-tight; }
+
+  ::selection { @apply bg-brand/20; }
+
+  /* Type scale */
+  h1 { @apply font-display text-4xl md:text-5xl lg:text-6xl tracking-tight; }
+  h2 { @apply font-display text-3xl md:text-4xl tracking-tight; }
   h3 { @apply text-xl font-semibold; }
   p  { @apply text-[15px] leading-7 text-neutral-800; }
+
+  a { @apply text-inherit; }
+  :focus-visible { @apply outline-none ring-2 ring-brand/40; }
 }
 
-/* Reusable UI primitives (used across all pages) */
+/* Reusable UI primitives */
 @layer components {
-  .container-7xl { @apply mx-auto max-w-7xl px-4; }
+  .container-7xl { @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8; }
+  .stack         { @apply space-y-6 md:space-y-8; }
+  .eyebrow       { @apply text-[11px] uppercase tracking-widest text-neutral-500; }
 
-  .card {
-    @apply bg-white border border-neutral-200 rounded-2xl shadow-[0_1px_2px_rgba(16,24,40,0.04)];
-  }
+  .card      { @apply bg-white border border-neutral-200 rounded-2xl shadow-card; }
+  .card-hover{ @apply transition-shadow hover:shadow-xlsoft; }
 
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2
-           bg-brand text-white font-semibold
-           shadow-[0_1px_2px_rgba(16,24,40,0.04)]
-           hover:bg-brand-700 active:bg-brand-800 transition-colors;
-  }
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2
-           border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-50;
-  }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all; }
+  .btn-primary { @apply btn px-4 py-2 bg-brand text-white shadow-subtle hover:bg-brand-700 active:bg-brand-800; }
+  .btn-ghost   { @apply btn px-4 py-2 border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-50; }
+  .btn-lg      { @apply px-6 py-3 text-[15px]; }
 
   .input {
     @apply w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-[15px]
-           placeholder-neutral-400 shadow-[0_1px_2px_rgba(16,24,40,0.04)]
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300;
+           placeholder-neutral-400 shadow-subtle focus:outline-none focus:ring-2 focus:ring-neutral-300;
   }
+  .label { @apply text-[11px] uppercase tracking-wider text-neutral-500; }
+  .muted { @apply text-sm text-neutral-600; }
 
-  .label {
-    @apply text-[11px] uppercase tracking-wider text-neutral-500;
-  }
+  /* Glassy header helper */
+  .glass { @apply supports-[backdrop-filter]:bg-white/70 supports-[backdrop-filter]:backdrop-blur-md bg-white/90 ring-1 ring-black/5; }
 
-  .muted {
-    @apply text-sm text-neutral-600;
+  /* Darkening overlay for hero photos (pairs with bg-hero-gradient from Tailwind config) */
+  .hero-overlay { @apply bg-hero-gradient absolute inset-0; }
+
+  .link-underline { @apply underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-500; }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
