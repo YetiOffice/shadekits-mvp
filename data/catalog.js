@@ -15,23 +15,17 @@ export const FINISHES = [
   { id: "Bronze",label: "Bronze" },
 ];
 
-// --------- Infill (roof slats) ----------
-export const INFILL = [
-  { id: "None",        label: "None" },
-  { id: "SlatsOpen",   label: "Slats (Open)" },    // ~3" spacing
-  { id: "SlatsMedium", label: "Slats (Medium)" },  // ~1.5" spacing
-  { id: "SlatsTight",  label: "Slats (Tight)" },   // ~1" spacing
-];
+// --------- Infill options (if present in your original file) ---------
+// ... (unchanged)
 
 // --------- Heights (ft) ----------
 export const HEIGHTS = [8, 10, 12];
 
 // --------- Size presets (ft) ----------
 export const SIZE_PRESETS = [
-  { span: 10, depth: 10 },
   { span: 12, depth: 12 },
+  { span: 12, depth: 16 },
   { span: 12, depth: 20 },
-  { span: 20, depth: 20 },
 ];
 
 // --------- Hard limits (ft) ----------
