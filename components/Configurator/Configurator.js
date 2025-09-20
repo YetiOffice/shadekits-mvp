@@ -12,17 +12,17 @@ import {
   leadWeeksForSlug,
 } from "../../lib/buy";
 
-// Preset sizes for MVP (lock builder to these three)
+// Preset sizes (locked to three)
 const PRESET_SIZES = [
   { label: "12×12", span: 12, depth: 12 },
   { label: "12×16", span: 12, depth: 16 },
   { label: "12×20", span: 12, depth: 20 },
 ];
 
-// Load the R3F viewer on the client only
+// Client-only viewer
 const Viewer3D = dynamic(() => import("../Builder/Viewer3D"), { ssr: false });
 
-// Utility to map color ids into legacy pricing finish names
+// Map color id → legacy pricing finish
 function finishFromColor(colorId) {
   switch (colorId) {
     case "black":
@@ -44,7 +44,7 @@ export default function Configurator() {
   const router = useRouter();
   const { kit: kitSlug } = router.query || {};
 
-  // default config (will be overridden if kit param present)
+  // Default config; size overridden by kit slug if present
   const [cfg, setCfg] = useState({
     span: 12,
     depth: 12,
@@ -52,13 +52,9 @@ export default function Configurator() {
     colorId: "black",
     roofDesignId: ROOF_DESIGNS[0]?.id || "palmleaf",
   });
-
   const [zip, setZip] = useState("");
-  // State for quote form submission
-  const [quoteSending, setQuoteSending] = useState(false);
-  const [quoteMessage, setQuoteMessage] = useState("");
 
-  // Pull config from query (deep-link product pages)
+  // Load config from product slug (deep links)
   useEffect(() => {
     if (!kitSlug) return;
     const preset = configFromSlug(kitSlug);
@@ -72,6 +68,7 @@ export default function Configurator() {
     }
   }, [kitSlug]);
 
+  // Pricing input (legacy util expects this shape)
   const legacyPricingCfg = useMemo(
     () => ({
       style: "Mono",
@@ -85,27 +82,35 @@ export default function Configurator() {
     }),
     [cfg]
   );
-  const p = useMemo(() => computePrice(legacyPricingCfg, zip), [
-    legacyPricingCfg,
-    zip,
-  ]);
+  const p = useMemo(() => computePrice(legacyPricingCfg, zip), [legacyPricingCfg, zip]);
 
-  // Buy eligibility
-  const buyInfo = buyEligibleForConfig(cfg);
+  // Buy routing
+  const buyInfo = buyEligibleForConfig(cfg); // returns {eligible, kit}
   const isBuyable = buyInfo.eligible;
-  const matchedKit = buyInfo.kit; // contains slug, name, leadWeeks, config
+  const matchedKit = buyInfo.kit; // { slug, name, leadWeeks, config }
   const lead = matchedKit ? leadWeeksForSlug(matchedKit.slug) : [3, 5];
 
   // UI helpers
-  const colorName =
-    COLORS.find((c) => c.id === cfg.colorId)?.name || "Color";
-
+  const colorName = COLORS.find((c) => c.id === cfg.colorId)?.name || "Color";
   const pill = (active) =>
     `px-3 py-2 rounded-md border text-sm ${
       active
         ? "bg-red-600 text-white border-red-600"
         : "bg-white text-neutral-800 border-neutral-300 hover:bg-neutral-50"
     }`;
+
+  // Buy handler (simple redirect to your checkout endpoint using kit slug)
+  async function handleBuyNow() {
+    try {
+      const slug = matchedKit?.slug;
+      if (!isBuyable || !slug) return;
+      // Redirect – backend reads slug and uses PRICE_MAP
+      window.location.assign(`/api/checkout?slug=${encodeURIComponent(slug)}`);
+    } catch (e) {
+      console.error(e);
+      alert("Sorry—checkout is unavailable right now.");
+    }
+  }
 
   return (
     <div className="container-7xl mb-24">
@@ -121,8 +126,7 @@ export default function Configurator() {
             </div>
             <div className="flex gap-2 flex-wrap">
               {PRESET_SIZES.map((s) => {
-                const selected =
-                  cfg.span === s.span && cfg.depth === s.depth;
+                const selected = cfg.span === s.span && cfg.depth === s.depth;
                 return (
                   <button
                     key={`${s.span}x${s.depth}`}
@@ -151,9 +155,7 @@ export default function Configurator() {
                   key={h}
                   type="button"
                   className={pill(cfg.height === h)}
-                  onClick={() =>
-                    setCfg((v) => ({ ...v, height: h }))
-                  }
+                  onClick={() => setCfg((v) => ({ ...v, height: h }))}
                   aria-pressed={cfg.height === h}
                 >
                   {h} ft
@@ -174,14 +176,10 @@ export default function Configurator() {
                   type="button"
                   title={c.name}
                   className={`h-8 w-8 rounded-md border-2 ${
-                    cfg.colorId === c.id
-                      ? "border-red-600"
-                      : "border-transparent"
+                    cfg.colorId === c.id ? "border-red-600" : "border-transparent"
                   }`}
                   style={{ backgroundColor: c.hex }}
-                  onClick={() =>
-                    setCfg((v) => ({ ...v, colorId: c.id }))
-                  }
+                  onClick={() => setCfg((v) => ({ ...v, colorId: c.id }))}
                 >
                   <span className="sr-only">{c.name}</span>
                 </button>
@@ -200,9 +198,7 @@ export default function Configurator() {
                   key={rd.id}
                   type="button"
                   className={pill(cfg.roofDesignId === rd.id)}
-                  onClick={() =>
-                    setCfg((v) => ({ ...v, roofDesignId: rd.id }))
-                  }
+                  onClick={() => setCfg((v) => ({ ...v, roofDesignId: rd.id }))}
                   aria-pressed={cfg.roofDesignId === rd.id}
                 >
                   {rd.name}
@@ -212,34 +208,25 @@ export default function Configurator() {
           </section>
         </aside>
 
-        {/* Right side: preview + info */}
+        {/* Right column */}
         <div className="space-y-4">
-          {/* Spec strip */}
+          {/* Spec strip (NO buy-eligible chip) */}
           <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="px-2 py-1 rounded-md bg-neutral-100">Color: {colorName}</span>
             <span className="px-2 py-1 rounded-md bg-neutral-100">
-              Color: {colorName}
-            </span>
-            <span className="px-2 py-1 rounded-md bg-neutral-100">
-              Roof: {
-                ROOF_DESIGNS.find((r) => r.id === cfg.roofDesignId)?.name
-              }
+              Roof: {ROOF_DESIGNS.find((r) => r.id === cfg.roofDesignId)?.name}
             </span>
             <span className="px-2 py-1 rounded-md bg-neutral-100">
               Size: {cfg.span}×{cfg.depth}×{cfg.height} ft
             </span>
-            {isBuyable && matchedKit && (
-              <span className="px-2 py-1 rounded-md bg-green-100 text-green-800">
-                Buy-eligible • {kitName(matchedKit.slug)}
-              </span>
-            )}
           </div>
 
           {/* Viewer */}
-          <div className="p-4 border rounded-lg bg-neutral-50 md:col-span-2">
+          <div className="p-4 border rounded-lg bg-neutral-50">
             <Viewer3D config={cfg} />
           </div>
 
-          {/* Budget / ZIP */}
+          {/* ZIP + Budget */}
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-neutral-600 mb-1">
@@ -260,14 +247,27 @@ export default function Configurator() {
             </div>
           </div>
 
-          {/* Freight & notes */}
-          <div className="md:col-span-2 text-sm text-neutral-600">
+          {/* BUY BOX (single primary CTA) */}
+          {isBuyable && matchedKit && (
+            <div className="border rounded-lg p-4 flex flex-col gap-2 md:max-w-md">
+              <button
+                type="button"
+                className="btn btn-primary w-full"
+                onClick={handleBuyNow}
+              >
+                Buy Now
+              </button>
+              <div className="text-xs text-neutral-600 text-center">
+                Secure checkout • Ships in {lead[0]}–{lead[1]} weeks
+              </div>
+            </div>
+          )}
+
+          {/* Description / notes */}
+          <div className="text-sm text-neutral-600">
             Posts modeled as 4×4 (“I” square). Typical lead time {lead[0]}–{lead[1]} weeks.
             Includes pre-cut steel, hardware, anchors as specified, finish schedule, and install guide.
           </div>
-
-          {/* Quote form (sticky CTA handles Buy) */}
-          {/* ... your existing quote form and sticky bar remain unchanged ... */}
         </div>
       </div>
     </div>
