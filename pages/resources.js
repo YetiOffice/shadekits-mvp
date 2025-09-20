@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Layout from "../components/Layout";
 import MetaStrip from "../components/MetaStrip";
 import FAQMini from "../components/FAQMini";
@@ -6,10 +5,10 @@ import FAQMini from "../components/FAQMini";
 const SPEC_PACK_URL = process.env.NEXT_PUBLIC_SPEC_PACK_URL || "/spec-pack.pdf";
 
 const docs = [
-  { title: "Anchoring Overview", href: SPEC_PACK_URL, note: "PDF" },
-  { title: "Finish & Care", href: SPEC_PACK_URL, note: "PDF" },
-  { title: "Wind / Snow / Permitting Notes", href: SPEC_PACK_URL, note: "PDF" },
-  { title: "Warranty Summary", href: SPEC_PACK_URL, note: "PDF" },
+  { title: "Anchoring Overview", note: "PDF" },
+  { title: "Finish & Care", note: "PDF" },
+  { title: "Wind / Snow / Permitting Notes", note: "PDF" },
+  { title: "Warranty Summary", note: "PDF" },
 ];
 
 export default function ResourcesPage() {
@@ -43,14 +42,7 @@ export default function ResourcesPage() {
             <div key={doc.title} className="card p-4">
               <div className="font-semibold">{doc.title}</div>
               <div className="text-sm text-neutral-600">{doc.note}</div>
-              <a
-                href={doc.href}
-                target="_blank"
-                rel="noopener"
-                className="btn btn-secondary mt-2"
-              >
-                Download PDF
-              </a>
+              {/* Button intentionally removed per Step 1 scope */}
             </div>
           ))}
         </div>
