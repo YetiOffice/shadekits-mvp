@@ -1,9 +1,9 @@
-// Map each kit slug to its Stripe Price ID.
-// Replace 'price_xxx...' with the actual IDs from your Stripe dashboard.
+// data/priceMap.js
+// Map each kit slug to its Stripe Price ID (FULL PURCHASE, not deposit).
+// Replace 'price_xxx...' with your real Stripe Price IDs.
+
 export const PRICE_MAP = {
-  "patio-pro-10x10": "price_1S6aTtJvCA6mRFZE433fFRAQ",
-  "poolside-pavilion-12x12": "price_1S6Zw0JvCA6mRFZETLRiP70b",
-  "cafe-cover-20x20": "price_1S6aVTJvCA6mRFZEbmMeGZUr",
-  "patio-pro-14x14": "price_AAAAAAAAAAAAAAAA", // if you added 14×14
-  "patio-pro-16x16": "price_BBBBBBBBBBBBBBBB", // if you added 16×16
+  "patio-pro-12x12": "price_xxxxxxxxxxxxxxxxxx",
+  "patio-pro-12x16": "price_yyyyyyyyyyyyyyyyyy",
+  "patio-pro-12x20": "price_zzzzzzzzzzzzzzzzzz",
 };
