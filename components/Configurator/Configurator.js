@@ -99,13 +99,26 @@ export default function Configurator() {
         : "bg-white text-neutral-800 border-neutral-300 hover:bg-neutral-50"
     }`;
 
-  // Buy handler (simple redirect to your checkout endpoint using kit slug)
+  // ✅ Buy handler: POST to /api/checkout, then redirect to Stripe
   async function handleBuyNow() {
     try {
       const slug = matchedKit?.slug;
       if (!isBuyable || !slug) return;
-      // Redirect – backend reads slug and uses PRICE_MAP
-      window.location.assign(`/api/checkout?slug=${encodeURIComponent(slug)}`);
+
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // You can include cfg if you want it logged server-side:
+        body: JSON.stringify({ slug /*, cfg*/ }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Checkout failed (${res.status})`);
+      }
+      const { url } = await res.json();
+      if (!url) throw new Error("No checkout URL returned");
+
+      window.location.href = url;
     } catch (e) {
       console.error(e);
       alert("Sorry—checkout is unavailable right now.");
