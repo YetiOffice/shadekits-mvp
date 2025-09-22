@@ -382,6 +382,8 @@ const Viewer3D = forwardRef(function Viewer3D(
     config = { span: 12, depth: 12, height: 10, colorId: "black", roofDesignId: "palmleaf" },
     autoRotate = false,
     onScreenshot,
+    /** Feature flag: show snapshot button (default off). */
+    showSnapshot = false,
   },
   ref
 ) {
@@ -401,6 +403,11 @@ const Viewer3D = forwardRef(function Viewer3D(
 
   const beamTop = config.height;
   const roofY = beamTop;
+
+  // runtime/buildtime flag so you can re-enable without code changes if needed
+  const envWantsSnapshot =
+    typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_SHOW_SNAPSHOT === "true";
 
   return (
     <div className="relative h-[600px] rounded-2xl border border-neutral-200 overflow-hidden">
@@ -435,13 +442,15 @@ const Viewer3D = forwardRef(function Viewer3D(
         </group>
       </Canvas>
 
-      {/* Fixed DOM button pinned to the viewer (not part of the WebGL scene) */}
-      <button
-        onClick={doSnapshot}
-        className="absolute bottom-3 right-3 z-10 text-xs px-2 py-1 rounded border border-neutral-300 bg-white/90 shadow-sm hover:bg-white"
-      >
-        Save Concept Image
-      </button>
+      {/* Snapshot button removed by default; can be re-enabled via prop or env */}
+      {(showSnapshot || envWantsSnapshot) && (
+        <button
+          onClick={doSnapshot}
+          className="absolute bottom-3 right-3 z-10 text-xs px-2 py-1 rounded border border-neutral-300 bg-white/90 shadow-sm hover:bg-white"
+        >
+          Save Concept Image
+        </button>
+      )}
     </div>
   );
 });
