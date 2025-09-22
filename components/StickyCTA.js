@@ -44,7 +44,7 @@ export default function StickyCTA({ threshold = 500 }) {
           <div className="hidden sm:block w-16 h-12 rounded-xl overflow-hidden relative">
             {/* Use any image that exists in /public (e.g. /flagship.jpg) */}
             <Image
-              src="/hero.jpg"
+              src="public/patio-pro-10x10.jpg"
               alt=""
               fill
               sizes="64px"
