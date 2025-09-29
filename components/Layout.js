@@ -79,7 +79,7 @@ export default function Layout({
           {/* CTA (desktop) */}
           <div className="hidden md:flex">
             <Link href="/builder" className="btn-primary btn-lg">
-              Get a Quote
+              Build &amp; Price
             </Link>
           </div>
 
@@ -144,7 +144,7 @@ export default function Layout({
                 onClick={() => setOpen(false)}
                 className="btn-primary btn-lg mt-3 w-full text-center"
               >
-                Get a Quote
+                Build &amp; Price
               </Link>
             </nav>
           </div>
