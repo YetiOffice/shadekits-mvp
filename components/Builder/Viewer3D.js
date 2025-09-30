@@ -85,6 +85,7 @@ function useExtrudedPlate({
   plateLengthIn = 120,
   thicknessIn = THICK_IN,
   mirror = false,
+  color = "#f5f5f5",        // NEW: incoming plate color (string or THREE.Color)
 }) {
   const groupRef = useRef();
 
@@ -102,7 +103,7 @@ function useExtrudedPlate({
         const sy = plateLengthIn / Math.max(1e-6, vb.height);
 
         const mat = new THREE.MeshStandardMaterial({
-          color: "#f5f5f5",
+          color,                   // use the passed-in color
           metalness: 0.85,
           roughness: 0.25,
           side: THREE.DoubleSide,
@@ -154,18 +155,19 @@ function useExtrudedPlate({
         }
       }
     };
-  }, [svgUrl, plateWidthIn, plateLengthIn, thicknessIn, mirror]);
+  }, [svgUrl, plateWidthIn, plateLengthIn, thicknessIn, mirror, color]); // include color in deps
 
   return groupRef;
 }
 
-function Plate({ svgUrl, widthIn, lengthIn, mirror }) {
+function Plate({ svgUrl, widthIn, lengthIn, mirror, color }) {
   const ref = useExtrudedPlate({
     svgUrl,
     plateWidthIn: widthIn,
     plateLengthIn: lengthIn,
     thicknessIn: THICK_IN,
     mirror,
+    color, // NEW
   });
   return <group ref={ref} scale={[IN, IN, IN]} />;
 }
@@ -255,7 +257,7 @@ function pickDepthLayout(depthFt, seamFt) {
 }
 
 // ---- layout panels across roof (with seams + edge bands) ----
-function Panels({ spanFt, depthFt, roofY, svgUrl }) {
+function Panels({ spanFt, depthFt, roofY, svgUrl, panelColor }) {
   // 1) Solve layout along width (X)
   const { interiorCols, edgeW } = useMemo(
     () => pickWidthLayout(spanFt, SEAM_FT),
@@ -290,7 +292,6 @@ function Panels({ spanFt, depthFt, roofY, svgUrl }) {
   const totalRows = rowLengthsFt.length;
 
   // 3) Tile rectangles centered on the roof, adding seam gaps between adjacent tiles
-  //    Compute tile centers by walking across widths/lengths + seams.
   const xCenters = useMemo(() => {
     const centers = [];
     let x = -spanFt / 2;
@@ -330,7 +331,13 @@ function Panels({ spanFt, depthFt, roofY, svgUrl }) {
 
           return (
             <group key={`${i}-${j}`} position={[xc, 0, zc]} rotation={[-Math.PI / 2, 0, 0]}>
-              <Plate svgUrl={svgUrl} widthIn={widthIn} lengthIn={lengthIn} mirror={mirror} />
+              <Plate
+                svgUrl={svgUrl}
+                widthIn={widthIn}
+                lengthIn={lengthIn}
+                mirror={mirror}
+                color={panelColor} // pass down
+              />
             </group>
           );
         })
@@ -398,13 +405,20 @@ const Viewer3D = forwardRef(function Viewer3D(
 
   useImperativeHandle(ref, () => ({ snapshot: () => doSnapshot() }), [doSnapshot]);
 
-  const color = colorHex(config.colorId) || "#111";
+  const frameColor = colorHex(config.colorId) || "#111";
   const design = getDesign(config.roofDesignId);
+
+  const panelColor = useMemo(() => {
+    // Start from frame color, slightly desaturate & brighten so pattern reads
+    const c = new THREE.Color(frameColor);
+    c.offsetHSL(0, -0.10, +0.10);
+    return c;
+  }, [frameColor]);
 
   const beamTop = config.height;
   const roofY = beamTop;
 
-  // runtime/buildtime flag so you can re-enable without code changes if needed
+  // runtime/buildtime flag so you can re-enable snapshot without code changes if needed
   const envWantsSnapshot =
     typeof process !== "undefined" &&
     process.env.NEXT_PUBLIC_SHOW_SNAPSHOT === "true";
@@ -437,12 +451,22 @@ const Viewer3D = forwardRef(function Viewer3D(
         <Ground />
 
         <group>
-          <Frame spanFt={config.span} depthFt={config.depth} heightFt={config.height} color={color} />
-          <Panels spanFt={config.span} depthFt={config.depth} roofY={roofY} svgUrl={design.svg} />
+          <Frame
+            spanFt={config.span}
+            depthFt={config.depth}
+            heightFt={config.height}
+            color={frameColor}
+          />
+          <Panels
+            spanFt={config.span}
+            depthFt={config.depth}
+            roofY={roofY}
+            svgUrl={design.svg}
+            panelColor={panelColor}
+          />
         </group>
       </Canvas>
 
-      {/* Snapshot button removed by default; can be re-enabled via prop or env */}
       {(showSnapshot || envWantsSnapshot) && (
         <button
           onClick={doSnapshot}
