@@ -3,12 +3,12 @@ import Link from "next/link";
 import Section from "../Section";
 
 const IMAGES = [
-  { src: "/poolside-pavilion-12x12.jpg", alt: "Poolside pavilion with lighting" },
-  { src: "/patio-pro-10x10.jpg", alt: "White pergola over patio" },
-  { src: "/grand-pavilion-24x30.jpg", alt: "Custom dark pavilion" },
-  { src: "/market-pavilion-20x24.jpg", alt: "Outdoor dining pergola" },
-  { src: "/flagship.jpg", alt: "Modern backyard shade" },
-  { src: "/lifestyle.jpg", alt: "Pergola with fan & lights" },
+  { src: "/poolside-pavilion-12x12.jpg", alt: "Poolside Pavilion 12×12" },
+  { src: "/patio-pro-10x10.jpg",         alt: "Patio Pro 10×10" },
+  { src: "/market-pavilion-20x24.jpg",   alt: "Market Pavilion 20×24" },
+  { src: "/hero.jpg",                    alt: "Backyard pergola project" },
+  { src: "/grand-pavilion-24x30.jpg",    alt: "Grand Pavilion 24×30" },
+  { src: "/cafe-cover-20x20.jpg",        alt: "Cafe Cover 20×20" },
 ];
 
 export default function Gallery() {
