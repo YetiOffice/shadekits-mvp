@@ -3,10 +3,7 @@
 
 /**
  * Pergola Viewer – Smart-Fit panels with symmetric edge strips.
- * - Keeps stock panel width at 5 ft.
- * - Panel length is chosen from allowed lengths (<= 10 ft).
- * - Uses a fixed seam between tiles.
- * - Fills any pergola size cleanly with symmetric edge bands (no gaps to frame).
+ * Panels now tint to the chosen frame color (less metallic so light colors read correctly).
  */
 
 import React, {
@@ -78,6 +75,16 @@ function Frame({ spanFt, depthFt, heightFt, color }) {
   );
 }
 
+// Build a roof-plate material that shows color well without an HDR env map.
+function buildPlateMaterial(hex) {
+  return new THREE.MeshStandardMaterial({
+    color: new THREE.Color(hex),
+    metalness: 0.2,
+    roughness: 0.65,
+    side: THREE.DoubleSide,
+  });
+}
+
 // ---- SVG → extruded aluminum panels (per-tile size) ----
 function useExtrudedPlate({
   svgUrl,
@@ -85,9 +92,22 @@ function useExtrudedPlate({
   plateLengthIn = 120,
   thicknessIn = THICK_IN,
   mirror = false,
-  color = "#f5f5f5",        // NEW: incoming plate color (string or THREE.Color)
+  plateColorHex = "#0B0B0B",
 }) {
   const groupRef = useRef();
+  const plateMatRef = useRef(buildPlateMaterial(plateColorHex));
+
+  // Update color live when the chosen color changes
+  useEffect(() => {
+    if (!plateMatRef.current) return;
+    plateMatRef.current.color.set(plateColorHex);
+    // Update existing children
+    if (groupRef.current) {
+      groupRef.current.traverse((o) => {
+        if (o.isMesh) o.material = plateMatRef.current;
+      });
+    }
+  }, [plateColorHex]);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,13 +121,6 @@ function useExtrudedPlate({
         const vb = data.xml?.viewBox?.baseVal || { width: 4320, height: 8640, x: 0, y: 0 };
         const sx = plateWidthIn / Math.max(1e-6, vb.width);
         const sy = plateLengthIn / Math.max(1e-6, vb.height);
-
-        const mat = new THREE.MeshStandardMaterial({
-          color,                   // use the passed-in color
-          metalness: 0.85,
-          roughness: 0.25,
-          side: THREE.DoubleSide,
-        });
 
         const group = new THREE.Group();
 
@@ -127,7 +140,7 @@ function useExtrudedPlate({
             // Center on X/Y (Z up is added via rotation later)
             geom.translate(-plateWidthIn / 2, -plateLengthIn / 2, 0);
 
-            const mesh = new THREE.Mesh(geom, mat);
+            const mesh = new THREE.Mesh(geom, plateMatRef.current);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             group.add(mesh);
@@ -155,19 +168,19 @@ function useExtrudedPlate({
         }
       }
     };
-  }, [svgUrl, plateWidthIn, plateLengthIn, thicknessIn, mirror, color]); // include color in deps
+  }, [svgUrl, plateWidthIn, plateLengthIn, thicknessIn, mirror]);
 
   return groupRef;
 }
 
-function Plate({ svgUrl, widthIn, lengthIn, mirror, color }) {
+function Plate({ svgUrl, widthIn, lengthIn, mirror, plateColorHex }) {
   const ref = useExtrudedPlate({
     svgUrl,
     plateWidthIn: widthIn,
     plateLengthIn: lengthIn,
     thicknessIn: THICK_IN,
     mirror,
-    color, // NEW
+    plateColorHex,
   });
   return <group ref={ref} scale={[IN, IN, IN]} />;
 }
@@ -176,15 +189,11 @@ function Plate({ svgUrl, widthIn, lengthIn, mirror, color }) {
 function scoreEdge(edgeFt) {
   const within = edgeFt >= EDGE_MIN_FT && edgeFt <= EDGE_MAX_FT;
   const dist = Math.abs(edgeFt - EDGE_TARGET_FT);
-  // Prefer within-range, then closeness to target (lower is better)
   return { within, dist };
 }
 
 /** Choose interior columns and symmetric edge bands for the WIDTH axis */
 function pickWidthLayout(spanFt, seamFt) {
-  // interior columns of 5' panels; with two edge columns (possibly zero width)
-  // Feasible interior count N must satisfy: edgeW >= 0
-  // edgeW = (spanFt - N*PANEL_W_FT - (N + 1)*seamFt) / 2
   const candidates = [];
   const maxInterior = Math.max(
     1,
@@ -199,15 +208,12 @@ function pickWidthLayout(spanFt, seamFt) {
   }
 
   if (candidates.length === 0) {
-    // Extremely small span; fallback to 1 interior column, no edges
     return { interiorCols: 1, edgeW: 0 };
   }
 
-  // Prefer those within range and closest to target; tie-breaker: fewer total columns
   candidates.sort((a, b) => {
     if (a.within !== b.within) return a.within ? -1 : 1;
     if (a.dist !== b.dist) return a.dist - b.dist;
-    // prefer fewer total columns (edges don't change count here)
     return a.N - b.N;
   });
 
@@ -234,22 +240,20 @@ function pickDepthLayout(depthFt, seamFt) {
         edgeL: Math.max(0, edgeL),
         within,
         dist,
-        totalPanels: N, // used for tie-breaking
+        totalPanels: N,
       });
     }
   }
 
   if (options.length === 0) {
-    // Depth is very small; fallback to 1 interior row of the smallest allowed length
     return { L: ALLOWED_LENGTHS_FT[ALLOWED_LENGTHS_FT.length - 1], interiorRows: 1, edgeL: 0 };
   }
 
-  // Prefer within-range + closest to target; tie-breakers: fewer rows, longer L (fewer cuts)
   options.sort((a, b) => {
     if (a.within !== b.within) return a.within ? -1 : 1;
     if (a.dist !== b.dist) return a.dist - b.dist;
     if (a.interiorRows !== b.interiorRows) return a.interiorRows - b.interiorRows;
-    return b.L - a.L; // prefer longer panels if equal
+    return b.L - a.L;
   });
 
   const best = options[0];
@@ -257,14 +261,12 @@ function pickDepthLayout(depthFt, seamFt) {
 }
 
 // ---- layout panels across roof (with seams + edge bands) ----
-function Panels({ spanFt, depthFt, roofY, svgUrl, panelColor }) {
-  // 1) Solve layout along width (X)
+function Panels({ spanFt, depthFt, roofY, svgUrl, plateColorHex }) {
   const { interiorCols, edgeW } = useMemo(
     () => pickWidthLayout(spanFt, SEAM_FT),
     [spanFt]
   );
 
-  // Column widths (ft)
   const colWidthsFt = useMemo(() => {
     const arr = [];
     if (edgeW > 1e-6) arr.push(edgeW);
@@ -273,13 +275,11 @@ function Panels({ spanFt, depthFt, roofY, svgUrl, panelColor }) {
     return arr;
   }, [interiorCols, edgeW]);
 
-  // 2) Solve layout along depth (Z)
   const { L: panelL_FT, interiorRows, edgeL } = useMemo(
     () => pickDepthLayout(depthFt, SEAM_FT),
     [depthFt]
   );
 
-  // Row lengths (ft)
   const rowLengthsFt = useMemo(() => {
     const arr = [];
     if (edgeL > 1e-6) arr.push(edgeL);
@@ -291,7 +291,6 @@ function Panels({ spanFt, depthFt, roofY, svgUrl, panelColor }) {
   const totalCols = colWidthsFt.length;
   const totalRows = rowLengthsFt.length;
 
-  // 3) Tile rectangles centered on the roof, adding seam gaps between adjacent tiles
   const xCenters = useMemo(() => {
     const centers = [];
     let x = -spanFt / 2;
@@ -318,7 +317,6 @@ function Panels({ spanFt, depthFt, roofY, svgUrl, panelColor }) {
     return centers;
   }, [rowLengthsFt, depthFt, totalRows]);
 
-  // 4) Emit all tiles (each with its own plate size in inches)
   return (
     <group position-y={roofY}>
       {xCenters.map((xc, i) =>
@@ -336,7 +334,7 @@ function Panels({ spanFt, depthFt, roofY, svgUrl, panelColor }) {
                 widthIn={widthIn}
                 lengthIn={lengthIn}
                 mirror={mirror}
-                color={panelColor} // pass down
+                plateColorHex={plateColorHex}
               />
             </group>
           );
@@ -389,7 +387,6 @@ const Viewer3D = forwardRef(function Viewer3D(
     config = { span: 12, depth: 12, height: 10, colorId: "black", roofDesignId: "palmleaf" },
     autoRotate = false,
     onScreenshot,
-    /** Feature flag: show snapshot button (default off). */
     showSnapshot = false,
   },
   ref
@@ -406,19 +403,11 @@ const Viewer3D = forwardRef(function Viewer3D(
   useImperativeHandle(ref, () => ({ snapshot: () => doSnapshot() }), [doSnapshot]);
 
   const frameColor = colorHex(config.colorId) || "#111";
+  const plateColorHex = frameColor; // match panels to frame color
   const design = getDesign(config.roofDesignId);
 
-  const panelColor = useMemo(() => {
-    // Start from frame color, slightly desaturate & brighten so pattern reads
-    const c = new THREE.Color(frameColor);
-    c.offsetHSL(0, -0.10, +0.10);
-    return c;
-  }, [frameColor]);
+  const roofY = config.height;
 
-  const beamTop = config.height;
-  const roofY = beamTop;
-
-  // runtime/buildtime flag so you can re-enable snapshot without code changes if needed
   const envWantsSnapshot =
     typeof process !== "undefined" &&
     process.env.NEXT_PUBLIC_SHOW_SNAPSHOT === "true";
@@ -432,7 +421,9 @@ const Viewer3D = forwardRef(function Viewer3D(
         dpr={[1, 2]}
         camera={{ fov: 45, near: 0.1, far: 1000, position: [10, 12, 16] }}
       >
-        <ambientLight intensity={0.5} />
+        {/* Lights: keep the existing directional, add a soft hemisphere to lift colors */}
+        <ambientLight intensity={0.45} />
+        <hemisphereLight args={["#ffffff", "#b5b5b5", 0.5]} />
         <directionalLight
           position={[10, 18, 12]}
           intensity={1.2}
@@ -451,18 +442,13 @@ const Viewer3D = forwardRef(function Viewer3D(
         <Ground />
 
         <group>
-          <Frame
-            spanFt={config.span}
-            depthFt={config.depth}
-            heightFt={config.height}
-            color={frameColor}
-          />
+          <Frame spanFt={config.span} depthFt={config.depth} heightFt={config.height} color={frameColor} />
           <Panels
             spanFt={config.span}
             depthFt={config.depth}
             roofY={roofY}
             svgUrl={design.svg}
-            panelColor={panelColor}
+            plateColorHex={plateColorHex}
           />
         </group>
       </Canvas>
